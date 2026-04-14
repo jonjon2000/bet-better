@@ -569,10 +569,12 @@ async function searchPlayer() {
       if (d2.response && d2.response.length) { found = d2.response[0]; break; }
     }
 
-    // Last resort: search by last name with team ID but no season constraint
+    // Last resort: no season constraint — finds player even with 0 current-season apps
     if (!found) {
-      const d = await apiFetch('/players?search=' + encodeURIComponent(parts[parts.length - 1]) + '&team=' + team.id);
-      if (d.response && d.response.length) found = d.response[0];
+      for (const term of [normParts[normParts.length - 1], normParts[0]]) {
+        const d = await apiFetch('/players?search=' + encodeURIComponent(term) + '&team=' + team.id);
+        if (d.response && d.response.length) { found = d.response[0]; break; }
+      }
     }
 
     if (!found) { setPStatus('Player not found. Try using just the last name (e.g. "Alvarez" instead of "Julian Alvarez").', 'error'); return; }
