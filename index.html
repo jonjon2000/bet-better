@@ -411,6 +411,7 @@ function historyLoad_item(id) {
     state.team1 = d.team1; state.fixtures1 = d.fixtures1; state.upcoming1 = d.upcoming1;
     state.team2 = d.team2 || null; state.fixtures2 = d.fixtures2 || []; state.upcoming2 = d.upcoming2 || [];
     state.h2h = d.h2h || null;
+    state.teamStats1 = d.teamStats1 || null; state.teamStats2 = d.teamStats2 || null;
     state.activeLeague = 'all'; state.formFilter = 'all';
     if (state.team2) document.getElementById('bookieOddsRow').style.display = '';
     setStatus('');
@@ -448,6 +449,7 @@ const state = {
   team1: null, fixtures1: [], upcoming1: [],
   team2: null, fixtures2: [], upcoming2: [],
   h2h: null,
+  teamStats1: null, teamStats2: null,
   activeLeague: 'all',
   formFilter: 'all'   // 'last5' | 'last10' | 'all'
 };
@@ -679,6 +681,13 @@ async function searchTeam(slot) {
     state.activeLeague = 'all';
     state.formFilter = 'all';
 
+    // Fetch team statistics (goal timing breakdown)
+    try {
+      const leagueId = fixtures[0].league.id;
+      const tsData = await apiFetch('/teams/statistics?season=' + usedSeason + '&team=' + team.team.id + '&league=' + leagueId);
+      state['teamStats' + slot] = tsData.response || null;
+    } catch (e) { state['teamStats' + slot] = null; }
+
     // Fetch H2H if both teams loaded
     if (slot === 2 && state.team1) {
       await fetchH2H(state.team1.team.id, team.team.id);
@@ -696,7 +705,8 @@ async function searchTeam(slot) {
     historySave('team', label, {
       team1: state.team1, fixtures1: state.fixtures1, upcoming1: state.upcoming1,
       team2: state.team2, fixtures2: state.fixtures2, upcoming2: state.upcoming2,
-      h2h: state.h2h
+      h2h: state.h2h,
+      teamStats1: state.teamStats1, teamStats2: state.teamStats2
     });
   } catch (e) {
     setStatus(e.message, 'error');
@@ -740,6 +750,36 @@ function calcStats(fixtures, id) {
   const ht2GA = htFx.reduce((s, f) => s + (ga(f, id) - htGA(f, id)), 0);
   const htCount = htFx.length;
   return { homeF, awayF, allRes, homeRes, awayRes, hW, hD, hL, aW, aD, aL, hGF, hGA, aGF, aGA, cs, btts, byLeague, streak, ht1GF, ht1GA, ht2GF, ht2GA, htCount };
+}
+
+function goalTimingHtml(teamStats) {
+  if (!teamStats || !teamStats.goals) return '';
+  const mins = ['0-15','16-30','31-45','46-60','61-75','76-90','91-105'];
+  const forMin = teamStats.goals.for && teamStats.goals.for.minute;
+  const agMin = teamStats.goals.against && teamStats.goals.against.minute;
+  if (!forMin) return '';
+  const rows = mins.map(m => {
+    const f = forMin[m] || {}, a = agMin ? (agMin[m] || {}) : {};
+    return { m, scored: f.total || 0, conceded: a.total || 0, scoredPct: f.percentage || '0%', concededPct: a.percentage || '0%' };
+  });
+  const totalScored = rows.reduce((s, r) => s + r.scored, 0);
+  const maxScored = Math.max(...rows.map(r => r.scored), 1);
+  return `<div class="section"><div class="section-title">Goal timing</div>
+    <div style="display:grid;grid-template-columns:60px 1fr 40px 1fr 40px;gap:4px 8px;align-items:center;font-size:12px">
+      <div></div><div style="color:var(--text-secondary);font-size:11px">Scored</div><div></div><div style="color:var(--text-secondary);font-size:11px">Conceded</div><div></div>
+      ${rows.map(r => `
+        <div style="color:var(--text-secondary);font-size:11px">${r.m}'</div>
+        <div class="bar-track" style="height:8px"><div class="bar-fill bar-blue" style="width:${Math.round(r.scored/maxScored*100)}%"></div></div>
+        <div style="font-weight:600;color:${r.m==='0-15'?'var(--blue)':'var(--text)'}">${r.scored}</div>
+        <div class="bar-track" style="height:8px"><div class="bar-fill" style="width:${Math.round(r.conceded/maxScored*100)}%;background:var(--red)"></div></div>
+        <div style="color:var(--text-secondary)">${r.conceded}</div>
+      `).join('')}
+    </div>
+    <div style="margin-top:8px;font-size:12px;color:var(--text-secondary)">
+      Goals scored in first 15 min: <strong style="color:var(--blue)">${rows[0].scored}</strong> (${rows[0].scoredPct} of all goals) ·
+      Conceded in first 15 min: <strong style="color:var(--red)">${rows[0].conceded}</strong> (${rows[0].concededPct})
+    </div>
+  </div>`;
 }
 
 function buildTrends(fixtures, id) {
@@ -1123,6 +1163,7 @@ function renderAll() {
         Goals conceded: <strong>${pct(s1.ht1GA, s1.ht1GA + s1.ht2GA)}% in 1st half</strong> · ${pct(s1.ht2GA, s1.ht1GA + s1.ht2GA)}% in 2nd half
       </div>
     </div>` : ''}
+    ${goalTimingHtml(state.teamStats1)}
     <div class="section"><div class="section-title">Last 5 results</div>
       <div class="result-row">${s1.allRes.slice(-5).map(r => `<div class="pill pill-${r}">${r}</div>`).join('')}</div>
     </div>
