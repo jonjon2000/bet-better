@@ -764,7 +764,8 @@ function goalTimingHtml(teamStats) {
   });
   const totalScored = rows.reduce((s, r) => s + r.scored, 0);
   const maxScored = Math.max(...rows.map(r => r.scored), 1);
-  return `<div class="section"><div class="section-title">Goal timing</div>
+  const leagueName = teamStats.league ? teamStats.league.name : '';
+  return `<div class="section"><div class="section-title">Goal timing${leagueName ? ' — ' + leagueName + ' only' : ''}</div>
     <div style="display:grid;grid-template-columns:60px 1fr 40px 1fr 40px;gap:4px 8px;align-items:center;font-size:12px">
       <div></div><div style="color:var(--text-secondary);font-size:11px">Scored</div><div></div><div style="color:var(--text-secondary);font-size:11px">Conceded</div><div></div>
       ${rows.map(r => `
@@ -778,6 +779,7 @@ function goalTimingHtml(teamStats) {
     <div style="margin-top:8px;font-size:12px;color:var(--text-secondary)">
       Goals scored in first 15 min: <strong style="color:var(--blue)">${rows[0].scored}</strong> (${rows[0].scoredPct} of all goals) ·
       Conceded in first 15 min: <strong style="color:var(--red)">${rows[0].conceded}</strong> (${rows[0].concededPct})
+      ${leagueName ? `<br><span style="font-size:11px;opacity:0.7">Timing data covers ${leagueName} only — multi-competition totals will differ</span>` : ''}
     </div>
   </div>`;
 }
