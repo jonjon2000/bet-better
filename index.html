@@ -1073,7 +1073,7 @@ function renderAll() {
 
   const filterBar = `<div class="filter-bar">
     <button class="ftab ${state.activeLeague === 'all' ? 'active' : ''}" onclick="setLeague('all')">All competitions</button>
-    ${leagues1.map(lg => `<button class="ftab ${state.activeLeague === lg ? 'active' : ''}" onclick="setLeague(${JSON.stringify(lg)})">${lg}</button>`).join('')}
+    ${leagues1.map(lg => `<button class="ftab ${state.activeLeague === lg ? 'active' : ''}" onclick="setLeague(this.dataset.lg)" data-lg="${lg.replace(/"/g, '&quot;')}">${lg}</button>`).join('')}
   </div>
   <div class="filter-bar" style="margin-top:-4px;margin-bottom:12px">
     <button class="ftab ${state.formFilter === 'last5' ? 'active' : ''}" onclick="setFormFilter('last5')">Last 5</button>
@@ -1172,7 +1172,7 @@ function renderAll() {
     <div class="section"><div class="section-title">Form by competition — click any row to filter</div>
       ${Object.entries(s1.byLeague).map(([lg, fxs]) => {
         const res = fxs.map(f => getResult(f, id1)), w = res.filter(r => r === 'W').length, d2 = res.filter(r => r === 'D').length, l = res.filter(r => r === 'L').length;
-        return `<div class="comp-row" onclick="setLeague(${JSON.stringify(lg)})"><div class="comp-name">${lg}</div><div class="comp-record">${w}W ${d2}D ${l}L</div><div class="comp-pills">${res.slice(-8).map(r => `<div class="cp cp-${r}">${r}</div>`).join('')}</div></div>`;
+        return `<div class="comp-row" onclick="setLeague(this.dataset.lg)" data-lg="${lg.replace(/"/g, '&quot;')}"><div class="comp-name">${lg}</div><div class="comp-record">${w}W ${d2}D ${l}L</div><div class="comp-pills">${res.slice(-8).map(r => `<div class="cp cp-${r}">${r}</div>`).join('')}</div></div>`;
       }).join('')}
     </div>
     ${compareHtml}
