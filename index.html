@@ -681,12 +681,17 @@ async function searchTeam(slot) {
     state.activeLeague = 'all';
     state.formFilter = 'all';
 
-    // Fetch team statistics (goal timing breakdown)
-    try {
-      const leagueId = fixtures[0].league.id;
-      const tsData = await apiFetch('/teams/statistics?season=' + usedSeason + '&team=' + team.team.id + '&league=' + leagueId);
-      state['teamStats' + slot] = tsData.response || null;
-    } catch (e) { state['teamStats' + slot] = null; }
+    // Fetch team statistics per league (goal timing breakdown)
+    setStatus('Loading goal timing data...', 'loading');
+    const uniqueLeagues = [...new Map(fixtures.map(f => [f.league.id, f.league])).values()];
+    const statsCache = {};
+    for (const lg of uniqueLeagues) {
+      try {
+        const tsData = await apiFetch('/teams/statistics?season=' + usedSeason + '&team=' + team.team.id + '&league=' + lg.id);
+        if (tsData.response) statsCache[lg.name] = tsData.response;
+      } catch (e) { /* skip */ }
+    }
+    state['teamStats' + slot] = statsCache;
 
     // Fetch H2H if both teams loaded
     if (slot === 2 && state.team1) {
@@ -752,7 +757,20 @@ function calcStats(fixtures, id) {
   return { homeF, awayF, allRes, homeRes, awayRes, hW, hD, hL, aW, aD, aL, hGF, hGA, aGF, aGA, cs, btts, byLeague, streak, ht1GF, ht1GA, ht2GF, ht2GA, htCount };
 }
 
-function goalTimingHtml(teamStats) {
+function goalTimingHtml(statsCache, activeLeague) {
+  if (!statsCache || !Object.keys(statsCache).length) return '';
+  // Pick the right stats: active league if filtered, otherwise the league with most fixtures
+  let teamStats = null;
+  if (activeLeague !== 'all' && statsCache[activeLeague]) {
+    teamStats = statsCache[activeLeague];
+  } else {
+    // Pick league with highest total goals scored as proxy for "most played"
+    teamStats = Object.values(statsCache).sort((a, b) => {
+      const aG = a.goals && a.goals.for ? Object.values(a.goals.for.minute || {}).reduce((s, v) => s + (v.total || 0), 0) : 0;
+      const bG = b.goals && b.goals.for ? Object.values(b.goals.for.minute || {}).reduce((s, v) => s + (v.total || 0), 0) : 0;
+      return bG - aG;
+    })[0];
+  }
   if (!teamStats || !teamStats.goals) return '';
   const mins = ['0-15','16-30','31-45','46-60','61-75','76-90','91-105'];
   const forMin = teamStats.goals.for && teamStats.goals.for.minute;
@@ -762,10 +780,9 @@ function goalTimingHtml(teamStats) {
     const f = forMin[m] || {}, a = agMin ? (agMin[m] || {}) : {};
     return { m, scored: f.total || 0, conceded: a.total || 0, scoredPct: f.percentage || '0%', concededPct: a.percentage || '0%' };
   });
-  const totalScored = rows.reduce((s, r) => s + r.scored, 0);
   const maxScored = Math.max(...rows.map(r => r.scored), 1);
   const leagueName = teamStats.league ? teamStats.league.name : '';
-  return `<div class="section"><div class="section-title">Goal timing${leagueName ? ' — ' + leagueName + ' only' : ''}</div>
+  return `<div class="section"><div class="section-title">Goal timing — ${leagueName}</div>
     <div style="display:grid;grid-template-columns:60px 1fr 40px 1fr 40px;gap:4px 8px;align-items:center;font-size:12px">
       <div></div><div style="color:var(--text-secondary);font-size:11px">Scored</div><div></div><div style="color:var(--text-secondary);font-size:11px">Conceded</div><div></div>
       ${rows.map(r => `
@@ -779,7 +796,6 @@ function goalTimingHtml(teamStats) {
     <div style="margin-top:8px;font-size:12px;color:var(--text-secondary)">
       Goals scored in first 15 min: <strong style="color:var(--blue)">${rows[0].scored}</strong> (${rows[0].scoredPct} of all goals) ·
       Conceded in first 15 min: <strong style="color:var(--red)">${rows[0].conceded}</strong> (${rows[0].concededPct})
-      ${leagueName ? `<br><span style="font-size:11px;opacity:0.7">Timing data covers ${leagueName} only — multi-competition totals will differ</span>` : ''}
     </div>
   </div>`;
 }
@@ -1165,7 +1181,7 @@ function renderAll() {
         Goals conceded: <strong>${pct(s1.ht1GA, s1.ht1GA + s1.ht2GA)}% in 1st half</strong> · ${pct(s1.ht2GA, s1.ht1GA + s1.ht2GA)}% in 2nd half
       </div>
     </div>` : ''}
-    ${goalTimingHtml(state.teamStats1)}
+    ${goalTimingHtml(state.teamStats1, state.activeLeague)}
     <div class="section"><div class="section-title">Last 5 results</div>
       <div class="result-row">${s1.allRes.slice(-5).map(r => `<div class="pill pill-${r}">${r}</div>`).join('')}</div>
     </div>
