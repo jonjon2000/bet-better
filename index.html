@@ -450,7 +450,7 @@ const state = {
   team2: null, fixtures2: [], upcoming2: [],
   h2h: null,
   teamStats1: null, teamStats2: null,
-  corners1: null,
+  corners1: null, corners2: null,
   activeLeague: 'all',
   formFilter: 'all'   // 'last5' | 'last10' | 'all'
 };
@@ -681,7 +681,7 @@ async function searchTeam(slot) {
     state['upcoming' + slot] = (fxNext.response || []).sort((a, b) => new Date(a.fixture.date) - new Date(b.fixture.date));
     state.activeLeague = 'all';
     state.formFilter = 'all';
-    if (slot === 1) state.corners1 = null;
+    state['corners' + slot] = null;
 
     // Fetch team statistics per league (goal timing breakdown)
     setStatus('Loading goal timing data...', 'loading');
@@ -1076,12 +1076,13 @@ function poissonSectionHtml(model, name1, name2) {
 }
 
 // ── Corners ───────────────────────────────────────────────────────────────────
-async function loadCorners() {
-  if (!state.team1) return;
-  const btn = document.getElementById('cornersBtn');
+async function loadCorners(slot) {
+  const team = state['team' + slot];
+  if (!team) return;
+  const btn = document.getElementById('cornersBtn' + slot);
   if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
-  const id = state.team1.team.id;
-  const fixtures = state.fixtures1.slice(-15);
+  const id = team.team.id;
+  const fixtures = state['fixtures' + slot].slice(-15);
   const byLeague = {};
   for (const f of fixtures) {
     try {
@@ -1100,14 +1101,16 @@ async function loadCorners() {
       byLeague[lg].total.push(c + opp);
     } catch (e) { /* skip */ }
   }
-  state.corners1 = byLeague;
+  state['corners' + slot] = byLeague;
   renderAll();
 }
 
-function cornerSectionHtml(corners, activeLeague) {
+function cornerSectionHtml(corners, activeLeague, slot) {
+  const teamName = state['team' + slot] ? state['team' + slot].team.name : '';
+  const label = slot === 2 ? `Corners — ${teamName}` : 'Corners';
   if (!corners || !Object.keys(corners).length) {
-    return `<div class="section"><div class="section-title">Corners</div>
-      <button id="cornersBtn" class="btn-outline" onclick="loadCorners()" style="font-size:13px;padding:7px 16px">Load corner stats (last 15 games)</button>
+    return `<div class="section"><div class="section-title">${label}</div>
+      <button id="cornersBtn${slot}" class="btn-outline" onclick="loadCorners(${slot})" style="font-size:13px;padding:7px 16px">Load corner stats (last 15 games)</button>
     </div>`;
   }
   const entries = activeLeague !== 'all' && corners[activeLeague]
@@ -1125,7 +1128,7 @@ function cornerSectionHtml(corners, activeLeague) {
       </span>
     </div>`;
   }).join('');
-  return `<div class="section"><div class="section-title">Corners per game — last 15</div>${rows}</div>`;
+  return `<div class="section"><div class="section-title">${label} per game — last 15</div>${rows}</div>`;
 }
 
 // ── Main render ───────────────────────────────────────────────────────────────
@@ -1237,7 +1240,7 @@ function renderAll() {
       </div>
     </div>` : ''}
     ${goalTimingHtml(state.teamStats1, state.activeLeague)}
-    ${cornerSectionHtml(state.corners1, state.activeLeague)}
+    ${cornerSectionHtml(state.corners1, state.activeLeague, 1)}
     <div class="section"><div class="section-title">Last 5 results</div>
       <div class="result-row">${s1.allRes.slice(-5).map(r => `<div class="pill pill-${r}">${r}</div>`).join('')}</div>
     </div>
@@ -1248,6 +1251,7 @@ function renderAll() {
       }).join('')}
     </div>
     ${compareHtml}
+    ${state.team2 ? cornerSectionHtml(state.corners2, state.activeLeague, 2) : ''}
     ${h2hHtml}
     ${poissonHtml}
     <div class="section"><div class="section-title">Next fixture</div>${nextFixtureHtml(state.upcoming1, t1, state.fixtures1, id1)}</div>
