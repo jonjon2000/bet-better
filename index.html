@@ -210,6 +210,19 @@ button:disabled { opacity: 0.35; cursor: not-allowed; }
 .ou-bar-fill { height: 100%; border-radius: 99px; }
 .ou-bar-over { background: #378ADD; }
 .ou-bar-under { background: #1D9E75; }
+
+/* History */
+.history-list { display: flex; flex-direction: column; gap: 6px; }
+.history-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--bg-secondary); border-radius: var(--radius-sm); cursor: pointer; border: 0.5px solid transparent; transition: border-color 0.15s; }
+.history-item:hover { border-color: var(--border-strong); }
+.history-badge { font-size: 10px; font-weight: 700; letter-spacing: 0.05em; padding: 3px 7px; border-radius: 20px; flex-shrink: 0; text-transform: uppercase; }
+.badge-team { background: var(--blue-bg); color: var(--blue); border: 0.5px solid var(--blue-border); }
+.badge-player { background: var(--green-bg); color: var(--green); border: 0.5px solid var(--green-border); }
+.history-label { font-size: 14px; font-weight: 500; flex: 1; }
+.history-meta { font-size: 11px; color: var(--text-secondary); white-space: nowrap; }
+.history-del { font-size: 16px; color: var(--text-secondary); padding: 0 4px; line-height: 1; opacity: 0.5; transition: opacity 0.15s; flex-shrink: 0; }
+.history-del:hover { opacity: 1; color: var(--red); }
+.history-empty { font-size: 13px; color: var(--text-secondary); }
 </style>
 </head>
 <body>
@@ -220,6 +233,12 @@ button:disabled { opacity: 0.35; cursor: not-allowed; }
   <div class="card">
     <label>API-Football Key — get yours free at dashboard.api-football.com</label>
     <input type="password" id="apiKey" placeholder="Paste your key here..." />
+  </div>
+
+  <!-- History -->
+  <div class="card" id="historyCard" style="display:none">
+    <label>Recent searches</label>
+    <div class="history-list" id="historyList"></div>
   </div>
 
   <!-- Player Scout -->
@@ -355,6 +374,76 @@ function resolveTeamQuery(q) {
   return TEAM_ALIASES[q.toLowerCase().trim()] || q;
 }
 
+// ── History ───────────────────────────────────────────────────────────────────
+const HISTORY_KEY = 'betbetter_history';
+const MAX_HISTORY = 15;
+
+function historyLoad() {
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch { return []; }
+}
+
+function historySave(type, label, data) {
+  const items = historyLoad().filter(i => i.label !== label || i.type !== type);
+  items.unshift({ id: Date.now(), type, label, ts: Date.now(), data });
+  if (items.length > MAX_HISTORY) items.length = MAX_HISTORY;
+  try { localStorage.setItem(HISTORY_KEY, JSON.stringify(items)); } catch { /* storage full */ }
+  renderHistory();
+}
+
+function historyDelete(id, e) {
+  e.stopPropagation();
+  const items = historyLoad().filter(i => i.id !== id);
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(items));
+  renderHistory();
+}
+
+function historyLoad_item(id) {
+  const item = historyLoad().find(i => i.id === id);
+  if (!item) return;
+  if (item.type === 'player') {
+    playerData = item.data.player;
+    document.getElementById('playerResults').innerHTML = '';
+    setPStatus('');
+    renderPlayerResults(playerData);
+    document.getElementById('playerResults').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } else {
+    const d = item.data;
+    state.team1 = d.team1; state.fixtures1 = d.fixtures1; state.upcoming1 = d.upcoming1;
+    state.team2 = d.team2 || null; state.fixtures2 = d.fixtures2 || []; state.upcoming2 = d.upcoming2 || [];
+    state.h2h = d.h2h || null;
+    state.activeLeague = 'all'; state.formFilter = 'all';
+    if (state.team2) document.getElementById('bookieOddsRow').style.display = '';
+    setStatus('');
+    renderAll();
+    document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+function fmtTs(ts) {
+  const d = new Date(ts), now = new Date();
+  const diff = now - d;
+  if (diff < 60000) return 'just now';
+  if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
+  if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
+  if (diff < 604800000) return Math.floor(diff / 86400000) + 'd ago';
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+}
+
+function renderHistory() {
+  const items = historyLoad();
+  const card = document.getElementById('historyCard');
+  const list = document.getElementById('historyList');
+  if (!items.length) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  list.innerHTML = items.map(item => `
+    <div class="history-item" onclick="historyLoad_item(${item.id})">
+      <span class="history-badge ${item.type === 'player' ? 'badge-player' : 'badge-team'}">${item.type}</span>
+      <span class="history-label">${item.label}</span>
+      <span class="history-meta">${fmtTs(item.ts)}</span>
+      <span class="history-del" onclick="historyDelete(${item.id}, event)" title="Remove">×</span>
+    </div>`).join('');
+}
+
 const state = {
   team1: null, fixtures1: [], upcoming1: [],
   team2: null, fixtures2: [], upcoming2: [],
@@ -421,6 +510,7 @@ function applyFormFilter(fixtures) {
 }
 
 // ── Player Scout ─────────────────────────────────────────────────────────────
+renderHistory();
 document.getElementById('playerName').addEventListener('keydown', e => { if (e.key === 'Enter') searchPlayer(); });
 document.getElementById('playerTeam').addEventListener('keydown', e => { if (e.key === 'Enter') searchPlayer(); });
 document.getElementById('oddsInput').addEventListener('input', () => { if (playerData) renderPlayerResults(playerData); });
@@ -478,6 +568,7 @@ async function searchPlayer() {
     playerData = found;
     setPStatus('');
     renderPlayerResults(found);
+    historySave('player', found.player.firstname + ' ' + found.player.lastname, { player: found });
   } catch (e) {
     setPStatus(e.message, 'error');
   } finally {
@@ -597,6 +688,14 @@ async function searchTeam(slot) {
 
     setStatus('');
     renderAll();
+    const label = state.team2
+      ? state.team1.team.name + ' vs ' + state.team2.team.name
+      : state.team1.team.name;
+    historySave('team', label, {
+      team1: state.team1, fixtures1: state.fixtures1, upcoming1: state.upcoming1,
+      team2: state.team2, fixtures2: state.fixtures2, upcoming2: state.upcoming2,
+      h2h: state.h2h
+    });
   } catch (e) {
     setStatus(e.message, 'error');
   } finally {
