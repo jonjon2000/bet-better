@@ -725,8 +725,13 @@ async function searchTeam(slot) {
 async function fetchH2H(id1, id2) {
   try {
     setStatus('Loading head-to-head data...', 'loading');
-    const data = await apiFetch('/fixtures/headtohead?h2h=' + id1 + '-' + id2 + '&season=2024');
-    state.h2h = data.response || [];
+    const [d2025, d2024] = await Promise.all([
+      apiFetch('/fixtures/headtohead?h2h=' + id1 + '-' + id2 + '&season=2025'),
+      apiFetch('/fixtures/headtohead?h2h=' + id1 + '-' + id2 + '&season=2024'),
+    ]);
+    const combined = [...(d2025.response || []), ...(d2024.response || [])];
+    combined.sort((a, b) => new Date(b.fixture.date) - new Date(a.fixture.date));
+    state.h2h = combined;
   } catch (e) {
     state.h2h = [];
   }
