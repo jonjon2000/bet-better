@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Football Trends Analyzer</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #ffffff; --bg-secondary: #f5f5f3; --bg-tertiary: #eeecea;
+  --text: #1a1a18; --text-secondary: #6b6b67;
+  --border: rgba(0,0,0,0.11); --border-strong: rgba(0,0,0,0.2);
+  --green-bg: #EAF3DE; --green: #3B6D11; --green-border: #C0DD97;
+  --red-bg: #FCEBEB; --red: #A32D2D; --red-border: #F7C1C1;
+  --amber-bg: #FAEEDA; --amber: #854F0B; --amber-border: #FAC775;
+  --blue-bg: #E6F1FB; --blue: #185FA5; --blue-border: #B5D4F4;
+  --radius: 12px; --radius-sm: 7px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1c1c1a; --bg-secondary: #252523; --bg-tertiary: #2e2e2b;
+    --text: #e8e8e4; --text-secondary: #8a8a85;
+    --border: rgba(255,255,255,0.09); --border-strong: rgba(255,255,255,0.18);
+    --green-bg: #173404; --green: #97C459; --green-border: #3B6D11;
+    --red-bg: #501313; --red: #F09595; --red-border: #A32D2D;
+    --amber-bg: #412402; --amber: #EF9F27; --amber-border: #854F0B;
+    --blue-bg: #042C53; --blue: #85B7EB; --blue-border: #185FA5;
+  }
+}
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg-tertiary); color: var(--text); min-height: 100vh; padding: 2rem 1rem; }
+.container { max-width: 820px; margin: 0 auto; }
+h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
+.subtitle { font-size: 14px; color: var(--text-secondary); margin-top: 4px; margin-bottom: 1.5rem; }
+.card { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 1.25rem 1.5rem; margin-bottom: 1rem; }
+label { font-size: 11px; letter-spacing: 0.07em; color: var(--text-secondary); display: block; margin-bottom: 7px; text-transform: uppercase; }
+input[type="text"], input[type="password"], input[type="number"] {
+  width: 100%; padding: 10px 13px; font-size: 14px;
+  border: 0.5px solid var(--border-strong); border-radius: var(--radius-sm);
+  background: var(--bg-secondary); color: var(--text); outline: none;
+  font-family: inherit; transition: border-color 0.15s;
+}
+input:focus { border-color: #378ADD; box-shadow: 0 0 0 3px rgba(55,138,221,0.1); }
+input[type="password"] { font-family: monospace; font-size: 13px; letter-spacing: 0.05em; }
+input[type="number"] { width: 110px; }
+.row { display: flex; gap: 8px; align-items: center; }
+.row input { flex: 1; }
+button {
+  padding: 10px 20px; font-size: 14px; font-weight: 500;
+  border: 0.5px solid var(--border-strong); border-radius: var(--radius-sm);
+  background: var(--text); color: var(--bg); cursor: pointer;
+  font-family: inherit; transition: opacity 0.15s; white-space: nowrap;
+}
+button:hover { opacity: 0.82; }
+button:disabled { opacity: 0.35; cursor: not-allowed; }
+.btn-outline { background: transparent; color: var(--text); border: 0.5px solid var(--border-strong); }
+.btn-outline:hover { background: var(--bg-secondary); }
+.status, .pstatus { font-size: 13px; color: var(--text-secondary); min-height: 22px; margin: 0.5rem 0; display: flex; align-items: center; gap: 8px; }
+.status.error, .pstatus.error { color: var(--red); }
+.status.loading, .pstatus.loading { color: var(--blue); }
+.spinner { width: 13px; height: 13px; border: 2px solid var(--border); border-top-color: var(--blue); border-radius: 50%; animation: spin 0.7s linear infinite; flex-shrink: 0; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Team */
+.team-header { display: flex; align-items: center; gap: 14px; margin-bottom: 1.5rem; padding-bottom: 1.25rem; border-bottom: 0.5px solid var(--border); }
+.team-logo { width: 50px; height: 50px; object-fit: contain; }
+.team-name { font-size: 21px; font-weight: 600; letter-spacing: -0.02em; }
+.team-sub { font-size: 13px; color: var(--text-secondary); margin-top: 3px; }
+.section { margin-bottom: 1.75rem; }
+.section-title { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 10px; padding-bottom: 6px; border-bottom: 0.5px solid var(--border); }
+.filter-bar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 1rem; }
+.ftab { font-size: 12px; padding: 5px 13px; border-radius: 20px; border: 0.5px solid var(--border-strong); cursor: pointer; background: var(--bg-secondary); color: var(--text-secondary); font-family: inherit; transition: all 0.15s; }
+.ftab:hover { border-color: #378ADD; color: #378ADD; }
+.ftab.active { background: var(--blue-bg); color: var(--blue); border-color: var(--blue-border); font-weight: 500; }
+.metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
+.metric { background: var(--bg-secondary); border-radius: var(--radius-sm); padding: 12px 14px; }
+.metric-label { font-size: 11px; color: var(--text-secondary); margin-bottom: 4px; }
+.metric-value { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; }
+.metric-sub { font-size: 11px; color: var(--text-secondary); margin-top: 3px; }
+.bar-track { background: var(--bg-tertiary); border-radius: 99px; height: 5px; overflow: hidden; margin-top: 8px; }
+.bar-fill { height: 100%; border-radius: 99px; }
+.bar-blue { background: #378ADD; } .bar-teal { background: #1D9E75; }
+.result-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.pill { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; font-size: 12px; font-weight: 600; border: 0.5px solid; }
+.pill-W { background: var(--green-bg); color: var(--green); border-color: var(--green-border); }
+.pill-D { background: var(--amber-bg); color: var(--amber); border-color: var(--amber-border); }
+.pill-L { background: var(--red-bg); color: var(--red); border-color: var(--red-border); }
+.comp-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 4px; border-bottom: 0.5px solid var(--border); gap: 12px; cursor: pointer; border-radius: 4px; transition: background 0.1s, padding 0.1s; }
+.comp-row:last-child { border-bottom: none; }
+.comp-row:hover { background: var(--bg-secondary); padding-left: 10px; }
+.comp-name { font-size: 14px; font-weight: 500; flex: 1; }
+.comp-record { font-size: 13px; color: var(--text-secondary); white-space: nowrap; }
+.comp-pills { display: flex; gap: 4px; }
+.cp { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; font-size: 10px; font-weight: 600; border: 0.5px solid; }
+.cp-W { background: var(--green-bg); color: var(--green); border-color: var(--green-border); }
+.cp-D { background: var(--amber-bg); color: var(--amber); border-color: var(--amber-border); }
+.cp-L { background: var(--red-bg); color: var(--red); border-color: var(--red-border); }
+.trend-list { display: flex; flex-direction: column; gap: 8px; }
+.trend-item { background: var(--bg-secondary); border-radius: var(--radius-sm); padding: 12px 14px; display: flex; gap: 10px; align-items: flex-start; cursor: pointer; border: 0.5px solid transparent; transition: border-color 0.15s; }
+.trend-item:hover { border-color: var(--border-strong); }
+.trend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
+.dot-green { background: #639922; } .dot-red { background: #E24B4A; } .dot-amber { background: #BA7517; } .dot-blue { background: #378ADD; }
+.trend-body { flex: 1; }
+.trend-text { font-size: 14px; line-height: 1.55; }
+.trend-text strong { font-weight: 600; }
+.trend-hint { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
+.trend-expand { display: none; margin-top: 8px; padding-top: 8px; border-top: 0.5px solid var(--border); }
+.trend-expand.open { display: block; }
+.match-evidence { display: flex; flex-direction: column; gap: 5px; }
+.match-ev-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-secondary); }
+.ev-pill { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; font-size: 9px; font-weight: 700; border: 0.5px solid; flex-shrink: 0; }
+.compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 540px) { .compare-grid { grid-template-columns: 1fr; } }
+.compare-col { background: var(--bg-secondary); border-radius: var(--radius-sm); padding: 12px 14px; }
+.compare-col h3 { font-size: 14px; font-weight: 600; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+.compare-col h3 img { width: 22px; height: 22px; object-fit: contain; }
+.compare-stat { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 0.5px solid var(--border); font-size: 13px; }
+.compare-stat:last-child { border-bottom: none; }
+.val { font-weight: 600; }
+.better { color: var(--green); }
+.next-fixture { background: var(--blue-bg); border: 0.5px solid var(--blue-border); border-radius: var(--radius-sm); padding: 12px 14px; }
+.next-label { font-size: 11px; color: var(--blue); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px; font-weight: 500; }
+.next-matchup { font-size: 16px; font-weight: 600; color: var(--blue); }
+.next-meta { font-size: 12px; color: var(--blue); opacity: 0.75; margin-top: 3px; }
+.next-context { font-size: 13px; margin-top: 8px; padding-top: 8px; border-top: 0.5px solid var(--blue-border); color: var(--text); line-height: 1.6; }
+
+/* Player scout */
+.player-header { display: flex; align-items: center; gap: 14px; margin-bottom: 1.25rem; padding-bottom: 1.25rem; border-bottom: 0.5px solid var(--border); }
+.player-photo { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; background: var(--bg-secondary); }
+.player-name { font-size: 19px; font-weight: 600; letter-spacing: -0.02em; }
+.player-sub { font-size: 13px; color: var(--text-secondary); margin-top: 3px; }
+.comp-goal-row { display: flex; align-items: center; justify-content: space-between; padding: 9px 0; border-bottom: 0.5px solid var(--border); font-size: 13px; gap: 12px; }
+.comp-goal-row:last-child { border-bottom: none; }
+.cgr-name { flex: 1; font-weight: 500; }
+.cgr-stat { color: var(--text-secondary); white-space: nowrap; }
+.cgr-rate { font-weight: 600; white-space: nowrap; }
+.value-box { border-radius: var(--radius-sm); padding: 14px 16px; margin-top: 0.5rem; }
+.value-box.great { background: var(--green-bg); border: 0.5px solid var(--green-border); }
+.value-box.ok { background: var(--amber-bg); border: 0.5px solid var(--amber-border); }
+.value-box.bad { background: var(--red-bg); border: 0.5px solid var(--red-border); }
+.value-box.neutral { background: var(--bg-secondary); border: 0.5px solid var(--border); }
+.value-label { font-size: 11px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; margin-bottom: 5px; }
+.value-box.great .value-label { color: var(--green); }
+.value-box.ok .value-label { color: var(--amber); }
+.value-box.bad .value-label { color: var(--red); }
+.value-box.neutral .value-label { color: var(--text-secondary); }
+.value-desc { font-size: 13px; line-height: 1.6; }
+.value-box.great .value-desc { color: var(--green); }
+.value-box.ok .value-desc { color: var(--amber); }
+.value-box.bad .value-desc { color: var(--red); }
+.value-box.neutral .value-desc { color: var(--text-secondary); }
+.odds-row { display: flex; gap: 10px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+.odds-row label { margin: 0; font-size: 13px; color: var(--text-secondary); text-transform: none; letter-spacing: 0; white-space: nowrap; }
+.section-divider { border: none; border-top: 0.5px solid var(--border); margin: 1.5rem 0; }
+
+/* H2H */
+.h2h-match-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 0.5px solid var(--border); font-size: 13px; gap: 8px; }
+.h2h-match-row:last-child { border-bottom: none; }
+.h2h-date { color: var(--text-secondary); font-size: 11px; white-space: nowrap; min-width: 58px; }
+.h2h-teams { flex: 1; font-weight: 500; }
+.h2h-score { font-weight: 700; font-size: 14px; white-space: nowrap; margin: 0 8px; }
+.h2h-league { color: var(--text-secondary); font-size: 11px; white-space: nowrap; }
+.h2h-record-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+.h2h-record-col { background: var(--bg-secondary); border-radius: var(--radius-sm); padding: 10px 12px; text-align: center; }
+.h2h-record-name { font-size: 11px; color: var(--text-secondary); margin-bottom: 6px; }
+.h2h-record-pills { display: flex; justify-content: center; gap: 6px; margin-bottom: 4px; }
+.h2h-record-stat { font-size: 11px; color: var(--text-secondary); }
+
+/* Poisson / prediction */
+.prediction-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+.pred-outcome { background: var(--bg-secondary); border-radius: var(--radius-sm); padding: 12px 10px; text-align: center; }
+.pred-outcome-label { font-size: 11px; color: var(--text-secondary); margin-bottom: 4px; }
+.pred-outcome-pct { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+.pred-bar-track { background: var(--bg-tertiary); border-radius: 99px; height: 4px; margin-top: 6px; overflow: hidden; }
+.pred-bar-fill { height: 100%; border-radius: 99px; background: #378ADD; }
+.scoreline-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 10px; }
+.scoreline-cell { background: var(--bg-secondary); border-radius: var(--radius-sm); padding: 10px 8px; text-align: center; }
+.scoreline-score { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
+.scoreline-pct { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+.lambda-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; font-size: 13px; color: var(--text-secondary); }
+.lambda-val { font-weight: 600; color: var(--text); }
+
+/* Bookmaker odds value */
+.bookie-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+.bookie-cell { border-radius: var(--radius-sm); padding: 12px 10px; text-align: center; border: 0.5px solid; }
+.bookie-cell.value { background: var(--green-bg); border-color: var(--green-border); }
+.bookie-cell.no-value { background: var(--red-bg); border-color: var(--red-border); }
+.bookie-cell.fair { background: var(--amber-bg); border-color: var(--amber-border); }
+.bookie-cell.neutral { background: var(--bg-secondary); border-color: var(--border); }
+.bookie-outcome-label { font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 4px; }
+.bookie-cell.value .bookie-outcome-label { color: var(--green); }
+.bookie-cell.no-value .bookie-outcome-label { color: var(--red); }
+.bookie-cell.fair .bookie-outcome-label { color: var(--amber); }
+.bookie-cell.neutral .bookie-outcome-label { color: var(--text-secondary); }
+.bookie-model-pct { font-size: 18px; font-weight: 700; }
+.bookie-cell.value .bookie-model-pct { color: var(--green); }
+.bookie-cell.no-value .bookie-model-pct { color: var(--red); }
+.bookie-cell.fair .bookie-model-pct { color: var(--amber); }
+.bookie-cell.neutral .bookie-model-pct { color: var(--text-secondary); }
+.bookie-detail { font-size: 11px; margin-top: 3px; opacity: 0.8; }
+.bookie-odds-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+.bookie-odds-row label { margin: 0; font-size: 12px; color: var(--text-secondary); text-transform: none; letter-spacing: 0; white-space: nowrap; }
+.bookie-odds-row input { width: 90px; }
+
+/* Over/Under */
+.ou-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.ou-cell { background: var(--bg-secondary); border-radius: var(--radius-sm); padding: 12px 14px; text-align: center; }
+.ou-label { font-size: 11px; color: var(--text-secondary); margin-bottom: 4px; }
+.ou-pct { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; }
+.ou-bar-track { background: var(--bg-tertiary); border-radius: 99px; height: 4px; margin-top: 6px; overflow: hidden; }
+.ou-bar-fill { height: 100%; border-radius: 99px; }
+.ou-bar-over { background: #378ADD; }
+.ou-bar-under { background: #1D9E75; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Football Trends Analyzer</h1>
+  <p class="subtitle">Uncover hidden contextual patterns that odds don't reflect</p>
+
+  <div class="card">
+    <label>API-Football Key — get yours free at dashboard.api-football.com</label>
+    <input type="password" id="apiKey" placeholder="Paste your key here..." />
+  </div>
+
+  <!-- Player Scout -->
+  <div class="card">
+    <label>Player scout — goals analysis &amp; value checker</label>
+    <div class="row" style="margin-bottom:8px">
+      <input type="text" id="playerTeam" placeholder="Player's team — e.g. Barcelona" />
+      <input type="text" id="playerName" placeholder="Player name — e.g. Rashford" />
+      <button id="pbtn" onclick="searchPlayer()">Scout</button>
+    </div>
+    <div class="odds-row">
+      <label>Bookmaker odds:</label>
+      <input type="number" id="oddsInput" placeholder="e.g. 3.50" step="0.01" min="1.01" />
+      <label style="font-size:12px">(updates value checker automatically)</label>
+    </div>
+  </div>
+  <div class="pstatus" id="pstatus"></div>
+  <div id="playerResults"></div>
+
+  <hr class="section-divider" />
+
+  <!-- Team Analysis -->
+  <div class="card">
+    <label>Team analysis</label>
+    <div class="row" style="margin-bottom:8px">
+      <input type="text" id="team1" placeholder="Team 1 — e.g. Arsenal" />
+      <button id="btn1" onclick="searchTeam(1)">Analyze</button>
+    </div>
+    <div class="row" style="margin-bottom:12px">
+      <input type="text" id="team2" placeholder="Team 2 (optional — for side by side comparison)" />
+      <button id="btn2" class="btn-outline" onclick="searchTeam(2)">Compare</button>
+    </div>
+    <div id="bookieOddsRow" style="display:none">
+      <label style="margin-bottom:8px">Bookmaker odds for match winner (optional — enables value check)</label>
+      <div class="bookie-odds-row">
+        <label>Home win:</label>
+        <input type="number" id="oddsHome" placeholder="e.g. 2.10" step="0.01" min="1.01" oninput="renderAll()" />
+        <label>Draw:</label>
+        <input type="number" id="oddsDraw" placeholder="e.g. 3.40" step="0.01" min="1.01" oninput="renderAll()" />
+        <label>Away win:</label>
+        <input type="number" id="oddsAway" placeholder="e.g. 3.60" step="0.01" min="1.01" oninput="renderAll()" />
+      </div>
+    </div>
+  </div>
+  <div class="status" id="status"></div>
+  <div id="results"></div>
+</div>
+
+<script>
+const TEAM_ALIASES = {
+  // French
+  'psg': 'Paris Saint-Germain',
+  // English
+  'man utd': 'Manchester United', 'man united': 'Manchester United', 'mufc': 'Manchester United',
+  'man city': 'Manchester City', 'mcfc': 'Manchester City',
+  'spurs': 'Tottenham', 'thfc': 'Tottenham',
+  'wolves': 'Wolverhampton',
+  'west ham': 'West Ham',
+  'newcastle': 'Newcastle United',
+  'brighton': 'Brighton',
+  'villa': 'Aston Villa',
+  'saints': 'Southampton',
+  'brentford': 'Brentford',
+  'forest': 'Nottingham Forest',
+  'nffc': 'Nottingham Forest',
+  'leicester': 'Leicester City',
+  'leeds': 'Leeds United',
+  'everton': 'Everton',
+  'chelsea': 'Chelsea',
+  'arsenal': 'Arsenal',
+  'liverpool': 'Liverpool',
+  // Spanish
+  'barca': 'Barcelona', 'fcb': 'Barcelona',
+  'real': 'Real Madrid', 'rm': 'Real Madrid', 'rmcf': 'Real Madrid',
+  'atletico': 'Atletico Madrid', 'atleti': 'Atletico Madrid',
+  'sevilla': 'Sevilla',
+  'villarreal': 'Villarreal',
+  'sociedad': 'Real Sociedad',
+  'betis': 'Real Betis',
+  'bilbao': 'Athletic Club',
+  'athletic': 'Athletic Club',
+  'valencia': 'Valencia',
+  // German
+  'bvb': 'Borussia Dortmund', 'dortmund': 'Borussia Dortmund',
+  'bmg': 'Borussia Monchengladbach', 'gladbach': 'Borussia Monchengladbach',
+  'fcb': 'Bayern Munich', 'bayern': 'Bayern Munich',
+  'rb leipzig': 'RB Leipzig', 'leipzig': 'RB Leipzig',
+  'leverkusen': 'Bayer Leverkusen',
+  'frankfurt': 'Eintracht Frankfurt',
+  'stuttgart': 'VfB Stuttgart',
+  'freiburg': 'SC Freiburg',
+  'wolfsburg': 'VfL Wolfsburg',
+  'hoffenheim': 'TSG Hoffenheim',
+  'augsburg': 'FC Augsburg',
+  'mainz': 'FSV Mainz',
+  'union berlin': 'Union Berlin',
+  'hertha': 'Hertha Berlin',
+  // Italian
+  'juve': 'Juventus', 'juventus': 'Juventus',
+  'inter': 'Inter Milan', 'inter milan': 'Inter Milan', 'nerazzurri': 'Inter Milan',
+  'ac milan': 'AC Milan', 'milan': 'AC Milan', 'rossoneri': 'AC Milan',
+  'roma': 'AS Roma',
+  'lazio': 'Lazio',
+  'napoli': 'Napoli',
+  'atalanta': 'Atalanta',
+  'fiorentina': 'Fiorentina',
+  'torino': 'Torino',
+  'bologna': 'Bologna',
+  'udinese': 'Udinese',
+  'sampdoria': 'Sampdoria',
+  'sassuolo': 'Sassuolo',
+  'cagliari': 'Cagliari',
+  'verona': 'Hellas Verona',
+  // Portuguese
+  'benfica': 'Benfica', 'slb': 'Benfica',
+  'sporting': 'Sporting CP', 'scp': 'Sporting CP',
+  'porto': 'FC Porto', 'fcp': 'FC Porto',
+  // Dutch
+  'ajax': 'Ajax',
+  'psv': 'PSV',
+  'feyenoord': 'Feyenoord',
+  // Turkish
+  'galatasaray': 'Galatasaray', 'gala': 'Galatasaray',
+  'fenerbahce': 'Fenerbahce',
+  'besiktas': 'Besiktas',
+  // Brazilian / other
+  'flamengo': 'Flamengo',
+  'fluminense': 'Fluminense',
+  'palmeiras': 'Palmeiras',
+};
+
+function resolveTeamQuery(q) {
+  return TEAM_ALIASES[q.toLowerCase().trim()] || q;
+}
+
+const state = {
+  team1: null, fixtures1: [], upcoming1: [],
+  team2: null, fixtures2: [], upcoming2: [],
+  h2h: null,
+  activeLeague: 'all',
+  formFilter: 'all'   // 'last5' | 'last10' | 'all'
+};
+let playerData = null;
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function setStatus(msg, type) {
+  const el = document.getElementById('status');
+  el.className = 'status ' + (type || '');
+  el.innerHTML = type === 'loading' ? '<div class="spinner"></div>' + msg : (msg || '');
+}
+function setPStatus(msg, type) {
+  const el = document.getElementById('pstatus');
+  el.className = 'pstatus ' + (type || '');
+  el.innerHTML = type === 'loading' ? '<div class="spinner"></div>' + msg : (msg || '');
+}
+async function apiFetch(path) {
+  const key = document.getElementById('apiKey').value.trim();
+  if (!key) throw new Error('Please enter your API key first');
+  const res = await fetch('https://v3.football.api-sports.io' + path, {
+    headers: { 'x-rapidapi-key': key, 'x-rapidapi-host': 'v3.football.api-sports.io' }
+  });
+  const data = await res.json();
+  if (data.errors && Object.keys(data.errors).length > 0) throw new Error(Object.values(data.errors)[0]);
+  return data;
+}
+function today() { return new Date().toISOString().split('T')[0]; }
+function futureDate(days) { const d = new Date(); d.setDate(d.getDate() + days); return d.toISOString().split('T')[0]; }
+function fmtDate(str) { return new Date(str).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); }
+function fmtDateFull(str) { return new Date(str).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }
+function isHome(f, id) { return f.teams.home.id === id; }
+function getResult(f, id) {
+  const h = f.teams.home, a = f.teams.away;
+  if (h.winner === null && a.winner === null) return 'D';
+  return isHome(f, id) ? (h.winner ? 'W' : a.winner ? 'L' : 'D') : (a.winner ? 'W' : h.winner ? 'L' : 'D');
+}
+function gf(f, id) { return isHome(f, id) ? (f.goals.home || 0) : (f.goals.away || 0); }
+function ga(f, id) { return isHome(f, id) ? (f.goals.away || 0) : (f.goals.home || 0); }
+function pct(a, b) { return b === 0 ? 0 : Math.round((a / b) * 100); }
+function avg(arr) { return arr.length ? (arr.reduce((s, v) => s + v, 0) / arr.length).toFixed(1) : '0.0'; }
+function avgNum(arr) { return arr.length ? arr.reduce((s, v) => s + v, 0) / arr.length : 0; }
+
+// Poisson helpers
+function factorial(k) {
+  if (k <= 1) return 1;
+  let r = 1;
+  for (let i = 2; i <= k; i++) r *= i;
+  return r;
+}
+function poissonPmf(lambda, k) {
+  if (lambda <= 0) return k === 0 ? 1 : 0;
+  return Math.exp(-lambda) * Math.pow(lambda, k) / factorial(k);
+}
+
+// Apply form filter (last N matches by date, sorted chronologically)
+function applyFormFilter(fixtures) {
+  if (state.formFilter === 'last5') return fixtures.slice(-5);
+  if (state.formFilter === 'last10') return fixtures.slice(-10);
+  return fixtures;
+}
+
+// ── Player Scout ─────────────────────────────────────────────────────────────
+document.getElementById('playerName').addEventListener('keydown', e => { if (e.key === 'Enter') searchPlayer(); });
+document.getElementById('playerTeam').addEventListener('keydown', e => { if (e.key === 'Enter') searchPlayer(); });
+document.getElementById('oddsInput').addEventListener('input', () => { if (playerData) renderPlayerResults(playerData); });
+
+async function searchPlayer() {
+  const pName = document.getElementById('playerName').value.trim();
+  const pTeam = resolveTeamQuery(document.getElementById('playerTeam').value.trim());
+  if (!pName) { setPStatus('Please enter a player name', 'error'); return; }
+  if (!pTeam) { setPStatus("Please enter the player's team", 'error'); return; }
+  if (!document.getElementById('apiKey').value.trim()) { setPStatus('Please enter your API key first', 'error'); return; }
+
+  document.getElementById('pbtn').disabled = true;
+  setPStatus('Looking up team...', 'loading');
+  document.getElementById('playerResults').innerHTML = '';
+  playerData = null;
+
+  try {
+    const season = 2024;
+    const teamData = await apiFetch('/teams?search=' + encodeURIComponent(pTeam));
+    if (!teamData.response || !teamData.response.length) { setPStatus('Team not found. Try a different spelling.', 'error'); return; }
+    const team = teamData.response[0].team;
+
+    setPStatus('Finding league...', 'loading');
+    const standData = await apiFetch('/standings?team=' + team.id + '&season=' + season);
+    let leagueId = null;
+    if (standData.response && standData.response.length) leagueId = standData.response[0].league.id;
+
+    setPStatus('Searching for ' + pName + '...', 'loading');
+    let found = null;
+    if (leagueId) {
+      const d = await apiFetch('/players?search=' + encodeURIComponent(pName) + '&league=' + leagueId + '&season=' + season);
+      if (d.response && d.response.length) found = d.response[0];
+    }
+    if (!found) {
+      const d = await apiFetch('/players?search=' + encodeURIComponent(pName) + '&team=' + team.id + '&season=' + season);
+      if (d.response && d.response.length) found = d.response[0];
+    }
+    if (!found) { setPStatus('Player not found. They may not have enough appearances recorded yet, or try a different spelling.', 'error'); return; }
+
+    setPStatus('Loading European stats...', 'loading');
+    const euroLeagues = [2, 3, 848];
+    for (const lgId of euroLeagues) {
+      try {
+        const d = await apiFetch('/players?search=' + encodeURIComponent(pName) + '&league=' + lgId + '&season=' + season);
+        if (d.response && d.response.length) {
+          const match = d.response.find(r => r.player.id === found.player.id);
+          if (match) {
+            const existingIds = new Set(found.statistics.map(s => s.league.id));
+            match.statistics.forEach(s => { if (!existingIds.has(s.league.id) && s.games.appearences > 0) found.statistics.push(s); });
+          }
+        }
+      } catch (e) { /* skip */ }
+    }
+
+    playerData = found;
+    setPStatus('');
+    renderPlayerResults(found);
+  } catch (e) {
+    setPStatus(e.message, 'error');
+  } finally {
+    document.getElementById('pbtn').disabled = false;
+  }
+}
+
+function renderPlayerResults(player) {
+  const p = player.player;
+  const stats = player.statistics || [];
+  if (!stats.length) {
+    document.getElementById('playerResults').innerHTML = '<div style="font-size:13px;color:var(--text-secondary);margin-bottom:1rem">No stats found for this player in 2024/25.</div>';
+    return;
+  }
+
+  const totalGoals = stats.reduce((s, st) => s + (st.goals.total || 0), 0);
+  const totalApps = stats.reduce((s, st) => s + (st.games.appearences || 0), 0);
+  const totalMins = stats.reduce((s, st) => s + (st.games.minutes || 0), 0);
+  const totalAssists = stats.reduce((s, st) => s + (st.goals.assists || 0), 0);
+  const totalShots = stats.reduce((s, st) => s + (st.shots.total || 0), 0);
+  const overallRate = totalApps > 0 ? totalGoals / totalApps : 0;
+  const minsPerGoal = totalGoals > 0 ? Math.round(totalMins / totalGoals) : null;
+  const compRows = stats.filter(st => st.games.appearences > 0).map(st => ({
+    lg: st.league.name, g: st.goals.total || 0, apps: st.games.appearences || 0,
+    rate: st.games.appearences > 0 ? (st.goals.total || 0) / st.games.appearences : 0
+  })).sort((a, b) => b.g - a.g);
+
+  const oddsVal = parseFloat(document.getElementById('oddsInput').value);
+  const impliedProb = (!isNaN(oddsVal) && oddsVal > 1) ? 1 / oddsVal : null;
+  let valueHtml = '';
+  if (impliedProb !== null) {
+    const edge = overallRate - impliedProb;
+    const edgePct = Math.round(Math.abs(edge) * 100);
+    if (edge >= 0.15) {
+      valueHtml = `<div class="value-box great"><div class="value-label">Strong value bet</div><div class="value-desc">Historical scoring rate: ${Math.round(overallRate * 100)}% per game · Bookmaker implies: ${Math.round(impliedProb * 100)}% · Your edge: +${edgePct}pts. The odds significantly underestimate this player.</div></div>`;
+    } else if (edge >= 0.05) {
+      valueHtml = `<div class="value-box ok"><div class="value-label">Slight value</div><div class="value-desc">Historical scoring rate: ${Math.round(overallRate * 100)}% · Bookmaker implies: ${Math.round(impliedProb * 100)}% · Edge: +${edgePct}pts. Modest value — consider competition context before betting.</div></div>`;
+    } else if (edge < -0.05) {
+      valueHtml = `<div class="value-box bad"><div class="value-label">No value</div><div class="value-desc">Historical scoring rate: ${Math.round(overallRate * 100)}% · Bookmaker implies: ${Math.round(impliedProb * 100)}% · The bookmaker is overestimating this player. Skip this bet.</div></div>`;
+    } else {
+      valueHtml = `<div class="value-box ok"><div class="value-label">Roughly fair odds</div><div class="value-desc">Historical scoring rate: ${Math.round(overallRate * 100)}% · Bookmaker implies: ${Math.round(impliedProb * 100)}% · The odds closely match the stats. No clear edge either way.</div></div>`;
+    }
+  } else {
+    valueHtml = `<div class="value-box neutral"><div class="value-label">Value checker</div><div class="value-desc">Enter the bookmaker odds in the field above to see if this is a value bet.</div></div>`;
+  }
+
+  document.getElementById('playerResults').innerHTML = `
+    <div class="card" style="margin-bottom:1rem">
+      <div class="player-header">
+        <img class="player-photo" src="${p.photo}" onerror="this.style.display='none'" />
+        <div>
+          <div class="player-name">${p.firstname} ${p.lastname}</div>
+          <div class="player-sub">${stats[0]?.team?.name || ''} · Age ${p.age} · ${p.nationality}</div>
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-title">Season overview — all competitions</div>
+        <div class="metrics">
+          <div class="metric"><div class="metric-label">Goals</div><div class="metric-value">${totalGoals}</div><div class="metric-sub">in ${totalApps} appearances</div></div>
+          <div class="metric"><div class="metric-label">Goals per game</div><div class="metric-value">${overallRate.toFixed(2)}</div><div class="metric-sub">≈ scores every ${overallRate > 0 ? Math.round(1 / overallRate) : '-'} games</div></div>
+          <div class="metric"><div class="metric-label">Mins per goal</div><div class="metric-value">${minsPerGoal || '–'}</div><div class="metric-sub">${totalMins} mins played</div></div>
+          <div class="metric"><div class="metric-label">Assists</div><div class="metric-value">${totalAssists}</div><div class="metric-sub">${totalShots || '–'} shots total</div></div>
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-title">Goals by competition</div>
+        ${compRows.map(r => `<div class="comp-goal-row"><div class="cgr-name">${r.lg}</div><div class="cgr-stat">${r.g} goals · ${r.apps} games</div><div class="cgr-rate">${r.rate.toFixed(2)}/game</div></div>`).join('')}
+      </div>
+      <div class="section" style="margin-bottom:0">
+        <div class="section-title">Value checker</div>
+        ${valueHtml}
+      </div>
+    </div>`;
+}
+
+// ── Team Analysis ─────────────────────────────────────────────────────────────
+document.getElementById('team1').addEventListener('keydown', e => { if (e.key === 'Enter') searchTeam(1); });
+document.getElementById('team2').addEventListener('keydown', e => { if (e.key === 'Enter') searchTeam(2); });
+
+async function searchTeam(slot) {
+  const raw = document.getElementById('team' + slot).value.trim();
+  const query = resolveTeamQuery(raw);
+  if (!query) return;
+  if (!document.getElementById('apiKey').value.trim()) { setStatus('Please enter your API key first', 'error'); return; }
+  document.getElementById('btn' + slot).disabled = true;
+  setStatus('Searching for team...', 'loading');
+  try {
+    const data = await apiFetch('/teams?search=' + encodeURIComponent(query));
+    if (!data.response || !data.response.length) { setStatus('No team found. Try a different spelling.', 'error'); return; }
+    const team = data.response[0];
+    setStatus('Found ' + team.team.name + '. Loading fixtures...', 'loading');
+    const season = 2024;
+    let fxDoneRes;
+
+    fxDoneRes = await apiFetch('/fixtures?team=' + team.team.id + '&season=' + season + '&status=FT-AET-PEN');
+
+    const usedSeason = (fxDoneRes.response && fxDoneRes.response.length) ? fxDoneRes.response[0].league.season : season;
+    const fxNext = await apiFetch('/fixtures?team=' + team.team.id + '&season=' + usedSeason + '&status=NS-TBD&from=' + today() + '&to=' + futureDate(60));
+
+    const fixtures = fxDoneRes.response || [];
+    if (!fixtures.length) { setStatus('No completed fixtures found for this team.', 'error'); return; }
+
+    state['team' + slot] = team;
+    state['fixtures' + slot] = fixtures;
+    state['upcoming' + slot] = (fxNext.response || []).sort((a, b) => new Date(a.fixture.date) - new Date(b.fixture.date));
+    state.activeLeague = 'all';
+    state.formFilter = 'all';
+
+    // Fetch H2H if both teams loaded
+    if (slot === 2 && state.team1) {
+      await fetchH2H(state.team1.team.id, team.team.id);
+    } else if (slot === 1 && state.team2) {
+      await fetchH2H(team.team.id, state.team2.team.id);
+    } else {
+      state.h2h = null;
+    }
+
+    setStatus('');
+    renderAll();
+  } catch (e) {
+    setStatus(e.message, 'error');
+  } finally {
+    document.getElementById('btn' + slot).disabled = false;
+  }
+}
+
+async function fetchH2H(id1, id2) {
+  try {
+    setStatus('Loading head-to-head data...', 'loading');
+    const data = await apiFetch('/fixtures/headtohead?h2h=' + id1 + '-' + id2 + '&season=2024');
+    state.h2h = data.response || [];
+  } catch (e) {
+    state.h2h = [];
+  }
+}
+
+function filterFixtures(fixtures, league) {
+  return league === 'all' ? fixtures : fixtures.filter(f => f.league.name === league);
+}
+
+function calcStats(fixtures, id) {
+  const homeF = fixtures.filter(f => isHome(f, id)), awayF = fixtures.filter(f => !isHome(f, id));
+  const allRes = fixtures.map(f => getResult(f, id));
+  const homeRes = homeF.map(f => getResult(f, id)), awayRes = awayF.map(f => getResult(f, id));
+  const hW = homeRes.filter(r => r === 'W').length, hD = homeRes.filter(r => r === 'D').length, hL = homeRes.filter(r => r === 'L').length;
+  const aW = awayRes.filter(r => r === 'W').length, aD = awayRes.filter(r => r === 'D').length, aL = awayRes.filter(r => r === 'L').length;
+  const hGF = homeF.reduce((s, f) => s + gf(f, id), 0), hGA = homeF.reduce((s, f) => s + ga(f, id), 0);
+  const aGF = awayF.reduce((s, f) => s + gf(f, id), 0), aGA = awayF.reduce((s, f) => s + ga(f, id), 0);
+  const cs = fixtures.filter(f => ga(f, id) === 0).length;
+  const btts = fixtures.filter(f => gf(f, id) > 0 && ga(f, id) > 0).length;
+  const byLeague = {};
+  fixtures.forEach(f => { const lg = f.league.name; if (!byLeague[lg]) byLeague[lg] = []; byLeague[lg].push(f); });
+  let streak = null;
+  if (allRes.length) { const last = allRes[allRes.length - 1]; let n = 1; for (let i = allRes.length - 2; i >= 0; i--) { if (allRes[i] === last) n++; else break; } streak = { type: last, count: n }; }
+  return { homeF, awayF, allRes, homeRes, awayRes, hW, hD, hL, aW, aD, aL, hGF, hGA, aGF, aGA, cs, btts, byLeague, streak };
+}
+
+function buildTrends(fixtures, id) {
+  const s = calcStats(fixtures, id), trends = [];
+  if (s.homeF.length >= 3 && s.awayF.length >= 3) {
+    const hR = pct(s.hW, s.homeF.length), aR = pct(s.aW, s.awayF.length), d = hR - aR;
+    if (d >= 20) trends.push({ color: 'dot-green', text: `<strong>Strong home fortress:</strong> Win rate at home is ${hR}% vs only ${aR}% away — a ${d}pt gap odds often ignore.`, evidence: s.homeF.filter(f => getResult(f, id) === 'W').slice(0, 6) });
+    else if (d <= -20) trends.push({ color: 'dot-blue', text: `<strong>Better on the road:</strong> Away win rate (${aR}%) outpaces home (${hR}%) — unusual pattern worth backing.`, evidence: s.awayF.filter(f => getResult(f, id) === 'W').slice(0, 6) });
+  }
+  if (s.homeF.length >= 3 && s.awayF.length >= 3) {
+    const hf = parseFloat(avg(s.homeF.map(f => gf(f, id)))), af = parseFloat(avg(s.awayF.map(f => gf(f, id))));
+    if (hf - af >= 0.7) trends.push({ color: 'dot-green', text: `<strong>Goals flow at home:</strong> Averaging ${hf.toFixed(1)} goals/game at home vs ${af.toFixed(1)} away. Over bets at home have historical backing.`, evidence: s.homeF.filter(f => gf(f, id) >= 2).slice(0, 6) });
+    const ha = parseFloat(avg(s.homeF.map(f => ga(f, id)))), aa = parseFloat(avg(s.awayF.map(f => ga(f, id))));
+    if (aa - ha >= 0.7) trends.push({ color: 'dot-green', text: `<strong>Tight home defence:</strong> Conceding ${ha.toFixed(1)}/game at home vs ${aa.toFixed(1)} away. Under and BTTS-No at home are recurring patterns.`, evidence: s.homeF.filter(f => ga(f, id) === 0).slice(0, 6) });
+  }
+  if (s.streak && s.streak.count >= 3) {
+    const lbl = s.streak.type === 'W' ? 'winning' : s.streak.type === 'L' ? 'losing' : 'drawing';
+    const dot = s.streak.type === 'W' ? 'dot-green' : s.streak.type === 'L' ? 'dot-red' : 'dot-amber';
+    trends.push({ color: dot, text: `<strong>Active ${s.streak.count}-game ${lbl} streak</strong> — momentum the market may not have fully priced in.`, evidence: fixtures.slice(-s.streak.count) });
+  }
+  const bttsR = pct(s.btts, fixtures.length);
+  if (bttsR >= 65) trends.push({ color: 'dot-amber', text: `<strong>Both teams score in ${bttsR}% of games</strong> — BTTS bets have a strong historical hit rate.`, evidence: fixtures.filter(f => gf(f, id) > 0 && ga(f, id) > 0).slice(0, 6) });
+  else if (bttsR <= 30 && fixtures.length >= 5) trends.push({ color: 'dot-amber', text: `<strong>Low BTTS rate (${bttsR}%):</strong> At least one side keeps a clean sheet most games. BTTS-No is the recurring outcome.`, evidence: fixtures.filter(f => gf(f, id) === 0 || ga(f, id) === 0).slice(0, 6) });
+  const csR = pct(s.cs, fixtures.length);
+  if (csR >= 40 && fixtures.length >= 5) trends.push({ color: 'dot-green', text: `<strong>Clean sheet in ${csR}% of games (${s.cs}/${fixtures.length}):</strong> Under 2.5 goals is a historically strong bet.`, evidence: fixtures.filter(f => ga(f, id) === 0).slice(0, 6) });
+  Object.entries(s.byLeague).forEach(([lg, fxs]) => {
+    if (fxs.length >= 4) {
+      const res = fxs.map(f => getResult(f, id)), w = res.filter(r => r === 'W').length, rate = pct(w, res.length);
+      if (rate >= 70) trends.push({ color: 'dot-blue', text: `<strong>Dominant in ${lg}:</strong> ${rate}% win rate (${w}/${fxs.length}) — competition-specific form the market may undervalue.`, evidence: fxs.filter(f => getResult(f, id) === 'W').slice(0, 6) });
+      else if (rate <= 25) trends.push({ color: 'dot-red', text: `<strong>Struggling in ${lg}:</strong> Only ${rate}% win rate (${w}/${fxs.length}) — poor form hidden by overall record.`, evidence: fxs.filter(f => getResult(f, id) === 'L').slice(0, 6) });
+    }
+  });
+  return trends;
+}
+
+function evidenceHtml(fixtures, id) {
+  if (!fixtures || !fixtures.length) return '<div style="font-size:12px;color:var(--text-secondary)">No supporting matches in current filter.</div>';
+  return '<div class="match-evidence">' + fixtures.map(f => {
+    const r = getResult(f, id), opp = isHome(f, id) ? f.teams.away.name : f.teams.home.name;
+    return `<div class="match-ev-row"><span class="ev-pill cp-${r}">${r}</span><span>${fmtDate(f.fixture.date)} · vs ${opp} (${isHome(f, id) ? 'H' : 'A'}) · ${f.goals.home}-${f.goals.away} · ${f.league.name}</span></div>`;
+  }).join('') + '</div>';
+}
+
+function nextFixtureHtml(upcoming, team, allFixtures, id) {
+  if (!upcoming || !upcoming.length) return '<div style="font-size:13px;color:var(--text-secondary)">No upcoming fixtures found in the next 60 days.</div>';
+  const next = upcoming[0], atHome = next.teams.home.id === id, opp = atHome ? next.teams.away : next.teams.home;
+  const h2h = allFixtures.filter(f => [f.teams.home.id, f.teams.away.id].includes(id) && [f.teams.home.id, f.teams.away.id].includes(opp.id));
+  const venueF = atHome ? allFixtures.filter(f => isHome(f, id)) : allFixtures.filter(f => !isHome(f, id));
+  const venueW = venueF.filter(f => getResult(f, id) === 'W').length;
+  let ctx = `${atHome ? 'Home' : 'Away'} record this season: ${venueW}W from ${venueF.length} games (${pct(venueW, venueF.length)}% win rate).`;
+  if (h2h.length) { const hw = h2h.filter(f => getResult(f, id) === 'W').length, hd = h2h.filter(f => getResult(f, id) === 'D').length, hl = h2h.filter(f => getResult(f, id) === 'L').length; ctx += ` H2H this season vs ${opp.name}: ${hw}W ${hd}D ${hl}L.`; }
+  return `<div class="next-fixture"><div class="next-label">Next fixture</div><div class="next-matchup">${team.team.name} vs ${opp.name}</div><div class="next-meta">${fmtDate(next.fixture.date)} · ${atHome ? 'Home' : 'Away'} · ${next.league.name}</div><div class="next-context">${ctx}</div></div>`;
+}
+
+// ── H2H section HTML ──────────────────────────────────────────────────────────
+function h2hSectionHtml(h2hFixtures, id1, id2, name1, name2) {
+  if (!h2hFixtures || !h2hFixtures.length) {
+    return `<div class="section"><div class="section-title">Head-to-head history (2024)</div><div style="font-size:13px;color:var(--text-secondary)">No H2H fixtures found for the 2024 season.</div></div>`;
+  }
+
+  // Sort by date descending, take last 10
+  const sorted = [...h2hFixtures].sort((a, b) => new Date(b.fixture.date) - new Date(a.fixture.date));
+  const last10 = sorted.slice(0, 10);
+
+  // W/D/L for each team from id1's perspective
+  let w1 = 0, d = 0, l1 = 0, totalGoals = 0;
+  last10.forEach(f => {
+    const r = getResult(f, id1);
+    if (r === 'W') w1++;
+    else if (r === 'D') d++;
+    else l1++;
+    totalGoals += (f.goals.home || 0) + (f.goals.away || 0);
+  });
+  const w2 = l1, l2 = w1; // mirror
+  const avgGoals = last10.length > 0 ? (totalGoals / last10.length).toFixed(2) : '0.00';
+
+  const recordHtml = `
+    <div class="h2h-record-grid">
+      <div class="h2h-record-col">
+        <div class="h2h-record-name">${name1}</div>
+        <div class="h2h-record-pills">
+          <span class="pill pill-W" style="width:28px;height:28px;font-size:11px">${w1}W</span>
+          <span class="pill pill-D" style="width:28px;height:28px;font-size:11px">${d}D</span>
+          <span class="pill pill-L" style="width:28px;height:28px;font-size:11px">${l1}L</span>
+        </div>
+        <div class="h2h-record-stat">from ${last10.length} recent H2H games</div>
+      </div>
+      <div class="h2h-record-col">
+        <div class="h2h-record-name">${name2}</div>
+        <div class="h2h-record-pills">
+          <span class="pill pill-W" style="width:28px;height:28px;font-size:11px">${w2}W</span>
+          <span class="pill pill-D" style="width:28px;height:28px;font-size:11px">${d}D</span>
+          <span class="pill pill-L" style="width:28px;height:28px;font-size:11px">${l2}L</span>
+        </div>
+        <div class="h2h-record-stat">avg ${avgGoals} goals/game</div>
+      </div>
+    </div>`;
+
+  const matchRows = last10.map(f => {
+    const homeTeam = f.teams.home.name;
+    const awayTeam = f.teams.away.name;
+    const score = `${f.goals.home ?? '?'} – ${f.goals.away ?? '?'}`;
+    const r = getResult(f, id1);
+    const pillCls = `cp cp-${r}`;
+    return `<div class="h2h-match-row">
+      <span class="h2h-date">${fmtDateFull(f.fixture.date)}</span>
+      <span class="h2h-teams">${homeTeam} vs ${awayTeam}</span>
+      <span class="h2h-score">${score}</span>
+      <span class="${pillCls}" title="${name1}: ${r}">${r}</span>
+      <span class="h2h-league">${f.league.name}</span>
+    </div>`;
+  }).join('');
+
+  return `<div class="section">
+    <div class="section-title">Head-to-head history (2024)</div>
+    ${recordHtml}
+    ${matchRows}
+  </div>`;
+}
+
+// ── Poisson model ─────────────────────────────────────────────────────────────
+function poissonModel(fixtures1, id1, fixtures2, id2) {
+  // Home stats for team1
+  const home1 = fixtures1.filter(f => isHome(f, id1));
+  const away2 = fixtures2.filter(f => !isHome(f, id2));
+
+  const avgHome1Scored = home1.length > 0 ? avgNum(home1.map(f => gf(f, id1))) : 0;
+  const avgAway2Conceded = away2.length > 0 ? avgNum(away2.map(f => ga(f, id2))) : 0;
+
+  // Away stats for team2
+  const away1 = fixtures1.filter(f => !isHome(f, id1));
+  const home2 = fixtures2.filter(f => isHome(f, id2));
+
+  const avgAway2Scored = away2.length > 0 ? avgNum(away2.map(f => gf(f, id2))) : 0;
+  const avgHome1Conceded = home1.length > 0 ? avgNum(home1.map(f => ga(f, id1))) : 0;
+
+  const lambdaHome = (avgHome1Scored + avgAway2Conceded) / 2;
+  const lambdaAway = (avgAway2Scored + avgHome1Conceded) / 2;
+
+  // Build probability matrix up to 7 goals each
+  const maxG = 7;
+  let pHomeWin = 0, pDraw = 0, pAwayWin = 0;
+  const matrix = [];
+
+  for (let h = 0; h <= maxG; h++) {
+    for (let a = 0; a <= maxG; a++) {
+      const prob = poissonPmf(lambdaHome, h) * poissonPmf(lambdaAway, a);
+      matrix.push({ h, a, prob });
+      if (h > a) pHomeWin += prob;
+      else if (h === a) pDraw += prob;
+      else pAwayWin += prob;
+    }
+  }
+
+  // Top 9 scorelines
+  const top9 = [...matrix].sort((a, b) => b.prob - a.prob).slice(0, 9);
+
+  // Over/Under 2.5
+  let pOver = 0, pUnder = 0;
+  matrix.forEach(({ h, a, prob }) => {
+    if (h + a > 2.5) pOver += prob;
+    else pUnder += prob;
+  });
+
+  return {
+    lambdaHome, lambdaAway,
+    pHomeWin, pDraw, pAwayWin,
+    pOver, pUnder,
+    top9,
+    avgHome1Scored, avgAway2Conceded, avgAway2Scored, avgHome1Conceded
+  };
+}
+
+function poissonSectionHtml(model, name1, name2) {
+  const hw = Math.round(model.pHomeWin * 100);
+  const dr = Math.round(model.pDraw * 100);
+  const aw = Math.round(model.pAwayWin * 100);
+  const ov = Math.round(model.pOver * 100);
+  const un = Math.round(model.pUnder * 100);
+
+  // Bookmaker value check
+  const oddsHome = parseFloat(document.getElementById('oddsHome').value);
+  const oddsDraw = parseFloat(document.getElementById('oddsDraw').value);
+  const oddsAway = parseFloat(document.getElementById('oddsAway').value);
+  const hasOdds = !isNaN(oddsHome) && oddsHome > 1 && !isNaN(oddsDraw) && oddsDraw > 1 && !isNaN(oddsAway) && oddsAway > 1;
+
+  function valueCell(label, modelPct, oddsVal) {
+    if (!hasOdds || isNaN(oddsVal) || oddsVal <= 1) {
+      return `<div class="bookie-cell neutral">
+        <div class="bookie-outcome-label">${label}</div>
+        <div class="bookie-model-pct">${modelPct}%</div>
+        <div class="bookie-detail">model probability</div>
+      </div>`;
+    }
+    const implied = 1 / oddsVal;
+    const edge = (modelPct / 100) - implied;
+    let cls, verdict, detail;
+    if (edge >= 0.05) { cls = 'value'; verdict = 'Value'; }
+    else if (edge <= -0.05) { cls = 'no-value'; verdict = 'No value'; }
+    else { cls = 'fair'; verdict = 'Fair'; }
+    const impliedPct = Math.round(implied * 100);
+    const edgeStr = (edge >= 0 ? '+' : '') + Math.round(edge * 100) + 'pts';
+    detail = `Model: ${modelPct}% · Implied: ${impliedPct}% · Edge: ${edgeStr}`;
+    return `<div class="bookie-cell ${cls}">
+      <div class="bookie-outcome-label">${verdict} — ${label}</div>
+      <div class="bookie-model-pct">${modelPct}%</div>
+      <div class="bookie-detail">${detail}</div>
+    </div>`;
+  }
+
+  const bookieHtml = `
+    <div class="section">
+      <div class="section-title">Bookmaker value check</div>
+      <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px">Enter odds above to enable — green = value (edge ≥ 5%), red = no value (edge ≤ −5%), amber = fair.</div>
+      <div class="bookie-grid">
+        ${valueCell(name1 + ' win', hw, oddsHome)}
+        ${valueCell('Draw', dr, oddsDraw)}
+        ${valueCell(name2 + ' win', aw, oddsAway)}
+      </div>
+    </div>`;
+
+  const top9Html = model.top9.map(({ h, a, prob }) => `
+    <div class="scoreline-cell">
+      <div class="scoreline-score">${h}–${a}</div>
+      <div class="scoreline-pct">${(prob * 100).toFixed(1)}%</div>
+    </div>`).join('');
+
+  return `
+    <div class="section">
+      <div class="section-title">Match prediction (Poisson model)</div>
+      <div class="lambda-row">
+        <span>Expected goals — <strong>${name1}:</strong> <span class="lambda-val">${model.lambdaHome.toFixed(2)}</span></span>
+        <span><strong>${name2}:</strong> <span class="lambda-val">${model.lambdaAway.toFixed(2)}</span></span>
+      </div>
+      <div class="prediction-grid">
+        <div class="pred-outcome">
+          <div class="pred-outcome-label">${name1} win</div>
+          <div class="pred-outcome-pct">${hw}%</div>
+          <div class="pred-bar-track"><div class="pred-bar-fill" style="width:${hw}%"></div></div>
+        </div>
+        <div class="pred-outcome">
+          <div class="pred-outcome-label">Draw</div>
+          <div class="pred-outcome-pct">${dr}%</div>
+          <div class="pred-bar-track"><div class="pred-bar-fill" style="width:${dr}%"></div></div>
+        </div>
+        <div class="pred-outcome">
+          <div class="pred-outcome-label">${name2} win</div>
+          <div class="pred-outcome-pct">${aw}%</div>
+          <div class="pred-bar-track"><div class="pred-bar-fill" style="width:${aw}%"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-title">Over / Under 2.5 goals</div>
+      <div class="ou-grid">
+        <div class="ou-cell">
+          <div class="ou-label">Over 2.5</div>
+          <div class="ou-pct">${ov}%</div>
+          <div class="ou-bar-track"><div class="ou-bar-fill ou-bar-over" style="width:${ov}%"></div></div>
+        </div>
+        <div class="ou-cell">
+          <div class="ou-label">Under 2.5</div>
+          <div class="ou-pct">${un}%</div>
+          <div class="ou-bar-track"><div class="ou-bar-fill ou-bar-under" style="width:${un}%"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-title">Most likely scorelines (top 9)</div>
+      <div class="scoreline-grid">${top9Html}</div>
+      <div style="font-size:11px;color:var(--text-secondary);margin-top:8px">${name1} scores left · ${name2} scores right</div>
+    </div>
+    ${bookieHtml}`;
+}
+
+// ── Main render ───────────────────────────────────────────────────────────────
+function renderAll() {
+  const t1 = state.team1; if (!t1) return;
+  const id1 = t1.team.id;
+
+  // Apply league filter then form filter
+  const leagueFiltered1 = filterFixtures(state.fixtures1, state.activeLeague);
+  const f1 = applyFormFilter(leagueFiltered1);
+
+  const leagues1 = [...new Set(state.fixtures1.map(f => f.league.name))];
+  const s1 = calcStats(f1, id1);
+  const trends1 = buildTrends(f1, id1);
+  const hWR = pct(s1.hW, s1.homeF.length), aWR = pct(s1.aW, s1.awayF.length);
+
+  const filterBar = `<div class="filter-bar">
+    <button class="ftab ${state.activeLeague === 'all' ? 'active' : ''}" onclick="setLeague('all')">All competitions</button>
+    ${leagues1.map(lg => `<button class="ftab ${state.activeLeague === lg ? 'active' : ''}" onclick="setLeague(${JSON.stringify(lg)})">${lg}</button>`).join('')}
+  </div>
+  <div class="filter-bar" style="margin-top:-4px;margin-bottom:12px">
+    <button class="ftab ${state.formFilter === 'last5' ? 'active' : ''}" onclick="setFormFilter('last5')">Last 5</button>
+    <button class="ftab ${state.formFilter === 'last10' ? 'active' : ''}" onclick="setFormFilter('last10')">Last 10</button>
+    <button class="ftab ${state.formFilter === 'all' ? 'active' : ''}" onclick="setFormFilter('all')">All games</button>
+  </div>`;
+
+  let compareHtml = '';
+  let h2hHtml = '';
+  let poissonHtml = '';
+
+  if (state.team2) {
+    const t2 = state.team2, id2 = t2.team.id;
+
+    // Show bookmaker odds inputs
+    document.getElementById('bookieOddsRow').style.display = 'block';
+
+    // Comparison always uses full datasets
+    const cf1 = state.fixtures1, cf2 = state.fixtures2;
+    const cs1 = calcStats(cf1, id1), s2 = calcStats(cf2, id2);
+    const h1 = pct(cs1.hW, cs1.homeF.length), h2 = pct(s2.hW, s2.homeF.length);
+    const a1 = pct(cs1.aW, cs1.awayF.length), a2 = pct(s2.aW, s2.awayF.length);
+    const g1 = parseFloat(avg(cf1.map(f => gf(f, id1)))), g2 = parseFloat(avg(cf2.map(f => gf(f, id2))));
+    const ga1 = parseFloat(avg(cf1.map(f => ga(f, id1)))), ga2 = parseFloat(avg(cf2.map(f => ga(f, id2))));
+    const c1 = pct(cs1.cs, cf1.length), c2 = pct(s2.cs, cf2.length);
+    const b1 = pct(cs1.btts, cf1.length), b2 = pct(s2.btts, cf2.length);
+    const w1 = pct(cs1.allRes.filter(r => r === 'W').length, cf1.length), w2 = pct(s2.allRes.filter(r => r === 'W').length, cf2.length);
+    function cls(v1, v2, hi = true) { if (v1 === v2) return ['', '']; return hi ? (v1 > v2 ? ['better', ''] : ['', 'better']) : (v1 < v2 ? ['better', ''] : ['', 'better']); }
+    const [wc1, wc2] = cls(w1, w2), [hc1, hc2] = cls(h1, h2), [ac1, ac2] = cls(a1, a2);
+    const [gc1, gc2] = cls(g1, g2), [gac1, gac2] = cls(ga1, ga2, false), [cc1, cc2] = cls(c1, c2), [bc1, bc2] = cls(b1, b2);
+
+    compareHtml = `<div class="section"><div class="section-title">Side by side comparison — all competitions</div><div class="compare-grid">
+      <div class="compare-col"><h3><img src="${t1.team.logo}" onerror="this.style.display='none'" />${t1.team.name}</h3>
+        <div class="compare-stat"><span>Overall win rate</span><span class="val ${wc1}">${w1}%</span></div>
+        <div class="compare-stat"><span>Home win rate</span><span class="val ${hc1}">${h1}%</span></div>
+        <div class="compare-stat"><span>Away win rate</span><span class="val ${ac1}">${a1}%</span></div>
+        <div class="compare-stat"><span>Goals/game</span><span class="val ${gc1}">${g1.toFixed(1)}</span></div>
+        <div class="compare-stat"><span>Conceded/game</span><span class="val ${gac1}">${ga1.toFixed(1)}</span></div>
+        <div class="compare-stat"><span>Clean sheet rate</span><span class="val ${cc1}">${c1}%</span></div>
+        <div class="compare-stat"><span>BTTS rate</span><span class="val ${bc1}">${b1}%</span></div>
+      </div>
+      <div class="compare-col"><h3><img src="${t2.team.logo}" onerror="this.style.display='none'" />${t2.team.name}</h3>
+        <div class="compare-stat"><span>Overall win rate</span><span class="val ${wc2}">${w2}%</span></div>
+        <div class="compare-stat"><span>Home win rate</span><span class="val ${hc2}">${h2}%</span></div>
+        <div class="compare-stat"><span>Away win rate</span><span class="val ${ac2}">${a2}%</span></div>
+        <div class="compare-stat"><span>Goals/game</span><span class="val ${gc2}">${g2.toFixed(1)}</span></div>
+        <div class="compare-stat"><span>Conceded/game</span><span class="val ${gac2}">${ga2.toFixed(1)}</span></div>
+        <div class="compare-stat"><span>Clean sheet rate</span><span class="val ${cc2}">${c2}%</span></div>
+        <div class="compare-stat"><span>BTTS rate</span><span class="val ${bc2}">${b2}%</span></div>
+      </div>
+    </div></div>`;
+
+    // H2H section
+    h2hHtml = h2hSectionHtml(state.h2h, id1, id2, t1.team.name, t2.team.name);
+
+    // Poisson model — use full (unfiltered) datasets so lambdas are stable
+    const model = poissonModel(cf1, id1, cf2, id2);
+    poissonHtml = poissonSectionHtml(model, t1.team.name, t2.team.name);
+  } else {
+    document.getElementById('bookieOddsRow').style.display = 'none';
+  }
+
+  document.getElementById('results').innerHTML = `<div class="card">
+    <div class="team-header">
+      <img class="team-logo" src="${t1.team.logo}" onerror="this.style.display='none'" />
+      <div>
+        <div class="team-name">${t1.team.name}</div>
+        <div class="team-sub">${t1.venue?.name || ''} · ${f1.length} games analyzed · 2024/25</div>
+      </div>
+    </div>
+    ${filterBar}
+    <div class="section"><div class="section-title">Home vs away split</div>
+      <div class="metrics">
+        <div class="metric"><div class="metric-label">Home win rate</div><div class="metric-value">${hWR}%</div><div class="metric-sub">${s1.hW}W ${s1.hD}D ${s1.hL}L in ${s1.homeF.length} games</div><div class="bar-track"><div class="bar-fill bar-blue" style="width:${hWR}%"></div></div></div>
+        <div class="metric"><div class="metric-label">Away win rate</div><div class="metric-value">${aWR}%</div><div class="metric-sub">${s1.aW}W ${s1.aD}D ${s1.aL}L in ${s1.awayF.length} games</div><div class="bar-track"><div class="bar-fill bar-teal" style="width:${aWR}%"></div></div></div>
+        <div class="metric"><div class="metric-label">Goals/game home</div><div class="metric-value">${avg(s1.homeF.map(f => gf(f, id1)))}</div><div class="metric-sub">Conceding ${avg(s1.homeF.map(f => ga(f, id1)))}/game</div></div>
+        <div class="metric"><div class="metric-label">Goals/game away</div><div class="metric-value">${avg(s1.awayF.map(f => gf(f, id1)))}</div><div class="metric-sub">Conceding ${avg(s1.awayF.map(f => ga(f, id1)))}/game</div></div>
+      </div>
+    </div>
+    <div class="section"><div class="section-title">Last 5 results</div>
+      <div class="result-row">${s1.allRes.slice(-5).map(r => `<div class="pill pill-${r}">${r}</div>`).join('')}</div>
+    </div>
+    <div class="section"><div class="section-title">Form by competition — click any row to filter</div>
+      ${Object.entries(s1.byLeague).map(([lg, fxs]) => {
+        const res = fxs.map(f => getResult(f, id1)), w = res.filter(r => r === 'W').length, d2 = res.filter(r => r === 'D').length, l = res.filter(r => r === 'L').length;
+        return `<div class="comp-row" onclick="setLeague(${JSON.stringify(lg)})"><div class="comp-name">${lg}</div><div class="comp-record">${w}W ${d2}D ${l}L</div><div class="comp-pills">${res.slice(-8).map(r => `<div class="cp cp-${r}">${r}</div>`).join('')}</div></div>`;
+      }).join('')}
+    </div>
+    ${compareHtml}
+    ${h2hHtml}
+    ${poissonHtml}
+    <div class="section"><div class="section-title">Next fixture</div>${nextFixtureHtml(state.upcoming1, t1, state.fixtures1, id1)}</div>
+    <div class="section"><div class="section-title">Trends &amp; betting insights — click any trend to see supporting matches</div>
+      ${trends1.length > 0 ? `<div class="trend-list">${trends1.map((t, i) => `
+        <div class="trend-item" onclick="toggleEv(${i})">
+          <div class="trend-dot ${t.color}"></div>
+          <div class="trend-body">
+            <div class="trend-text">${t.text}</div>
+            <div class="trend-hint">Click to see supporting matches</div>
+            <div class="trend-expand" id="ev-${i}">${evidenceHtml(t.evidence, id1)}</div>
+          </div>
+        </div>`).join('')}</div>` : `<div style="font-size:14px;color:var(--text-secondary)">No strong trends detected in current filter.</div>`}
+    </div>
+  </div>`;
+}
+
+function toggleEv(i) { const el = document.getElementById('ev-' + i); if (el) el.classList.toggle('open'); }
+function setLeague(lg) { state.activeLeague = lg; renderAll(); }
+function setFormFilter(f) { state.formFilter = f; renderAll(); }
+</script>
+</body>
+</html>
