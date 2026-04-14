@@ -556,12 +556,10 @@ async function searchPlayer() {
       if (d2.response && d2.response.length) { found = d2.response[0]; break; }
     }
 
-    // Last resort: search by name only across all leagues
+    // Last resort: search by last name with team ID but no season constraint
     if (!found) {
-      const d = await apiFetch('/players?search=' + encodeURIComponent(parts[parts.length - 1]) + '&season=' + season);
-      if (d.response && d.response.length) {
-        found = d.response.find(r => r.statistics.some(s => s.team.id === team.id)) || null;
-      }
+      const d = await apiFetch('/players?search=' + encodeURIComponent(parts[parts.length - 1]) + '&team=' + team.id);
+      if (d.response && d.response.length) found = d.response[0];
     }
 
     if (!found) { setPStatus('Player not found. Try using just the last name (e.g. "Alvarez" instead of "Julian Alvarez").', 'error'); return; }
