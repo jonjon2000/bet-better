@@ -528,7 +528,7 @@ async function searchPlayer() {
   playerData = null;
 
   try {
-    const season = 2024;
+    const season = 2025;
     const teamData = await apiFetch('/teams?search=' + encodeURIComponent(pTeam));
     if (!teamData.response || !teamData.response.length) { setPStatus('Team not found. Try a different spelling.', 'error'); return; }
     const team = teamData.response[0].team;
@@ -660,7 +660,7 @@ async function searchTeam(slot) {
     if (!data.response || !data.response.length) { setStatus('No team found. Try a different spelling.', 'error'); return; }
     const team = data.response[0];
     setStatus('Found ' + team.team.name + '. Loading fixtures...', 'loading');
-    const season = 2024;
+    const season = 2025;
     let fxDoneRes;
 
     fxDoneRes = await apiFetch('/fixtures?team=' + team.team.id + '&season=' + season + '&status=FT-AET-PEN');
