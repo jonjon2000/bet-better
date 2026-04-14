@@ -538,22 +538,33 @@ async function searchPlayer() {
     if (!teamData.response || !teamData.response.length) { setPStatus('Team not found. Try a different spelling.', 'error'); return; }
     const team = teamData.response[0].team;
 
-    setPStatus('Finding league...', 'loading');
-    const standData = await apiFetch('/standings?team=' + team.id + '&season=' + season);
-    let leagueId = null;
-    if (standData.response && standData.response.length) leagueId = standData.response[0].league.id;
-
     setPStatus('Searching for ' + pName + '...', 'loading');
     let found = null;
-    if (leagueId) {
-      const d = await apiFetch('/players?search=' + encodeURIComponent(pName) + '&league=' + leagueId + '&season=' + season);
-      if (d.response && d.response.length) found = d.response[0];
+
+    // Build a list of search terms to try: full name, last name only, first name only
+    const parts = pName.trim().split(/\s+/);
+    const searchTerms = [pName];
+    if (parts.length > 1) { searchTerms.push(parts[parts.length - 1]); searchTerms.push(parts[0]); }
+
+    for (const term of searchTerms) {
+      if (found) break;
+      // Try by team first (most precise)
+      const d = await apiFetch('/players?search=' + encodeURIComponent(term) + '&team=' + team.id + '&season=' + season);
+      if (d.response && d.response.length) { found = d.response[0]; break; }
+      // Also try previous season in case current season data is sparse
+      const d2 = await apiFetch('/players?search=' + encodeURIComponent(term) + '&team=' + team.id + '&season=2024');
+      if (d2.response && d2.response.length) { found = d2.response[0]; break; }
     }
+
+    // Last resort: search by name only across all leagues
     if (!found) {
-      const d = await apiFetch('/players?search=' + encodeURIComponent(pName) + '&team=' + team.id + '&season=' + season);
-      if (d.response && d.response.length) found = d.response[0];
+      const d = await apiFetch('/players?search=' + encodeURIComponent(parts[parts.length - 1]) + '&season=' + season);
+      if (d.response && d.response.length) {
+        found = d.response.find(r => r.statistics.some(s => s.team.id === team.id)) || null;
+      }
     }
-    if (!found) { setPStatus('Player not found. They may not have enough appearances recorded yet, or try a different spelling.', 'error'); return; }
+
+    if (!found) { setPStatus('Player not found. Try using just the last name (e.g. "Alvarez" instead of "Julian Alvarez").', 'error'); return; }
 
     setPStatus('Loading European stats...', 'loading');
     const euroLeagues = [2, 3, 848];
