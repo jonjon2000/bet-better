@@ -559,25 +559,47 @@ async function searchPlayer() {
       normParts[0]
     ])];
 
+    // Step 1: search by team (current + previous season + no season)
     for (const term of searchTerms) {
       if (found) break;
-      // Try by team first (most precise)
-      const d = await apiFetch('/players?search=' + encodeURIComponent(term) + '&team=' + team.id + '&season=' + season);
-      if (d.response && d.response.length) { found = d.response[0]; break; }
-      // Also try previous season in case current season data is sparse
-      const d2 = await apiFetch('/players?search=' + encodeURIComponent(term) + '&team=' + team.id + '&season=2024');
-      if (d2.response && d2.response.length) { found = d2.response[0]; break; }
-    }
-
-    // Last resort: no season constraint — finds player even with 0 current-season apps
-    if (!found) {
-      for (const term of [normParts[normParts.length - 1], normParts[0]]) {
-        const d = await apiFetch('/players?search=' + encodeURIComponent(term) + '&team=' + team.id);
+      for (const seasonParam of ['&season=' + season, '&season=2024', '']) {
+        const d = await apiFetch('/players?search=' + encodeURIComponent(term) + '&team=' + team.id + seasonParam);
         if (d.response && d.response.length) { found = d.response[0]; break; }
       }
     }
 
-    if (!found) { setPStatus('Player not found. Try using just the last name (e.g. "Alvarez" instead of "Julian Alvarez").', 'error'); return; }
+    // Step 2: get team's domestic league from recent fixtures, search there
+    if (!found) {
+      setPStatus('Not found at team, searching league...', 'loading');
+      try {
+        const fxData = await apiFetch('/fixtures?team=' + team.id + '&season=' + season + '&last=5');
+        if (fxData.response && fxData.response.length) {
+          const lgCounts = {};
+          fxData.response.forEach(f => { lgCounts[f.league.id] = (lgCounts[f.league.id] || 0) + 1; });
+          const leagueId = Object.keys(lgCounts).sort((a, b) => lgCounts[b] - lgCounts[a])[0];
+          for (const term of searchTerms) {
+            if (found) break;
+            const d = await apiFetch('/players?search=' + encodeURIComponent(term) + '&league=' + leagueId + '&season=' + season);
+            if (d.response && d.response.length) { found = d.response[0]; break; }
+          }
+        }
+      } catch(e) { /* skip */ }
+    }
+
+    // Step 3: search across top European leagues
+    if (!found) {
+      setPStatus('Searching across top leagues...', 'loading');
+      const topLeagues = [39, 140, 135, 78, 61, 88, 94, 203, 144, 307]; // PL, LaLiga, SerieA, Bundesliga, Ligue1, Eredivisie, PortugalLiga, Turkish, BelgiumA, SaudiPro
+      for (const lgId of topLeagues) {
+        if (found) break;
+        for (const term of [searchTerms[1] || searchTerms[0]]) { // last name
+          const d = await apiFetch('/players?search=' + encodeURIComponent(term) + '&league=' + lgId + '&season=' + season);
+          if (d.response && d.response.length) { found = d.response[0]; break; }
+        }
+      }
+    }
+
+    if (!found) { setPStatus('Player not found. Check the spelling or try a different team name.', 'error'); return; }
 
     setPStatus('Loading European stats...', 'loading');
     const euroLeagues = [2, 3, 848];
