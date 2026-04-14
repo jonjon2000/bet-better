@@ -450,6 +450,7 @@ const state = {
   team2: null, fixtures2: [], upcoming2: [],
   h2h: null,
   teamStats1: null, teamStats2: null,
+  corners1: null,
   activeLeague: 'all',
   formFilter: 'all'   // 'last5' | 'last10' | 'all'
 };
@@ -680,6 +681,7 @@ async function searchTeam(slot) {
     state['upcoming' + slot] = (fxNext.response || []).sort((a, b) => new Date(a.fixture.date) - new Date(b.fixture.date));
     state.activeLeague = 'all';
     state.formFilter = 'all';
+    if (slot === 1) state.corners1 = null;
 
     // Fetch team statistics per league (goal timing breakdown)
     setStatus('Loading goal timing data...', 'loading');
@@ -1073,6 +1075,59 @@ function poissonSectionHtml(model, name1, name2) {
     ${bookieHtml}`;
 }
 
+// ── Corners ───────────────────────────────────────────────────────────────────
+async function loadCorners() {
+  if (!state.team1) return;
+  const btn = document.getElementById('cornersBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
+  const id = state.team1.team.id;
+  const fixtures = state.fixtures1.slice(-15);
+  const byLeague = {};
+  for (const f of fixtures) {
+    try {
+      const d = await apiFetch('/fixtures/statistics?fixture=' + f.fixture.id);
+      const teamStats = (d.response || []).find(t => t.team.id === id);
+      if (!teamStats) continue;
+      const cornerStat = teamStats.statistics.find(s => s.type === 'Corner Kicks');
+      const oppStats = (d.response || []).find(t => t.team.id !== id);
+      const oppCornerStat = oppStats ? oppStats.statistics.find(s => s.type === 'Corner Kicks') : null;
+      const lg = f.league.name;
+      if (!byLeague[lg]) byLeague[lg] = { for: [], against: [], total: [] };
+      const c = parseInt(cornerStat && cornerStat.value) || 0;
+      const opp = parseInt(oppCornerStat && oppCornerStat.value) || 0;
+      byLeague[lg].for.push(c);
+      byLeague[lg].against.push(opp);
+      byLeague[lg].total.push(c + opp);
+    } catch (e) { /* skip */ }
+  }
+  state.corners1 = byLeague;
+  renderAll();
+}
+
+function cornerSectionHtml(corners, activeLeague) {
+  if (!corners || !Object.keys(corners).length) {
+    return `<div class="section"><div class="section-title">Corners</div>
+      <button id="cornersBtn" class="btn-outline" onclick="loadCorners()" style="font-size:13px;padding:7px 16px">Load corner stats (last 15 games)</button>
+    </div>`;
+  }
+  const entries = activeLeague !== 'all' && corners[activeLeague]
+    ? [[activeLeague, corners[activeLeague]]]
+    : Object.entries(corners);
+  const rows = entries.map(([lg, d]) => {
+    const avgFor = (d.for.reduce((s, v) => s + v, 0) / d.for.length).toFixed(1);
+    const avgAgainst = (d.against.reduce((s, v) => s + v, 0) / d.against.length).toFixed(1);
+    const avgTotal = (d.total.reduce((s, v) => s + v, 0) / d.total.length).toFixed(1);
+    return `<div class="compare-stat"><span>${lg} <span style="font-size:11px;color:var(--text-secondary)">(${d.for.length} games)</span></span>
+      <span style="display:flex;gap:16px">
+        <span><span style="font-size:11px;color:var(--text-secondary)">For </span><span class="val">${avgFor}</span></span>
+        <span><span style="font-size:11px;color:var(--text-secondary)">Ag </span><span class="val">${avgAgainst}</span></span>
+        <span><span style="font-size:11px;color:var(--text-secondary)">Total </span><span class="val">${avgTotal}</span></span>
+      </span>
+    </div>`;
+  }).join('');
+  return `<div class="section"><div class="section-title">Corners per game — last 15</div>${rows}</div>`;
+}
+
 // ── Main render ───────────────────────────────────────────────────────────────
 function renderAll() {
   const t1 = state.team1; if (!t1) return;
@@ -1182,6 +1237,7 @@ function renderAll() {
       </div>
     </div>` : ''}
     ${goalTimingHtml(state.teamStats1, state.activeLeague)}
+    ${cornerSectionHtml(state.corners1, state.activeLeague)}
     <div class="section"><div class="section-title">Last 5 results</div>
       <div class="result-row">${s1.allRes.slice(-5).map(r => `<div class="pill pill-${r}">${r}</div>`).join('')}</div>
     </div>
