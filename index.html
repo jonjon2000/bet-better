@@ -541,10 +541,21 @@ async function searchPlayer() {
     setPStatus('Searching for ' + pName + '...', 'loading');
     let found = null;
 
-    // Build a list of search terms to try: full name, last name only, first name only
+    // Normalize special chars: ø→o, æ→ae, å→a, ß→ss, ñ→n, etc.
+    function normalizeName(s) {
+      return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/ø/gi, 'o').replace(/æ/gi, 'ae').replace(/å/gi, 'a')
+        .replace(/ß/g, 'ss').replace(/ð/gi, 'd').replace(/þ/gi, 'th')
+        .replace(/ł/gi, 'l').replace(/ı/gi, 'i');
+    }
+    const normalizedName = normalizeName(pName);
+
+    // Build a list of search terms to try: full name, last name only, first name only (+ normalized variants)
     const parts = pName.trim().split(/\s+/);
-    const searchTerms = [pName];
-    if (parts.length > 1) { searchTerms.push(parts[parts.length - 1]); searchTerms.push(parts[0]); }
+    const normParts = normalizedName.trim().split(/\s+/);
+    const searchTerms = [...new Set([pName, normalizedName])];
+    if (parts.length > 1) { searchTerms.push(parts[parts.length - 1]); searchTerms.push(normParts[normParts.length - 1]); }
+    else { searchTerms.push(normParts[0]); }
 
     for (const term of searchTerms) {
       if (found) break;
