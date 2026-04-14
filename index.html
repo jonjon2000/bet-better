@@ -1076,40 +1076,39 @@ function poissonSectionHtml(model, name1, name2) {
 }
 
 // ── Corners ───────────────────────────────────────────────────────────────────
-async function loadCorners(slot) {
-  const team = state['team' + slot];
-  if (!team) return;
-  const btn = document.getElementById('cornersBtn' + slot);
-  if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
-  const id = team.team.id;
-  const fixtures = state['fixtures' + slot].slice(-15);
+async function fetchCornerData(teamId, fixtures) {
   const byLeague = {};
-  for (const f of fixtures) {
+  for (const f of fixtures.slice(-15)) {
     try {
       const d = await apiFetch('/fixtures/statistics?fixture=' + f.fixture.id);
-      const teamStats = (d.response || []).find(t => t.team.id === id);
-      if (!teamStats) continue;
-      const cornerStat = teamStats.statistics.find(s => s.type === 'Corner Kicks');
-      const oppStats = (d.response || []).find(t => t.team.id !== id);
-      const oppCornerStat = oppStats ? oppStats.statistics.find(s => s.type === 'Corner Kicks') : null;
+      const me = (d.response || []).find(t => Number(t.team.id) === Number(teamId));
+      if (!me) continue;
+      const them = (d.response || []).find(t => Number(t.team.id) !== Number(teamId));
+      const c = parseInt((me.statistics.find(s => s.type === 'Corner Kicks') || {}).value) || 0;
+      const opp = parseInt(((them && them.statistics.find(s => s.type === 'Corner Kicks')) || {}).value) || 0;
       const lg = f.league.name;
       if (!byLeague[lg]) byLeague[lg] = { for: [], against: [], total: [] };
-      const c = parseInt(cornerStat && cornerStat.value) || 0;
-      const opp = parseInt(oppCornerStat && oppCornerStat.value) || 0;
       byLeague[lg].for.push(c);
       byLeague[lg].against.push(opp);
       byLeague[lg].total.push(c + opp);
     } catch (e) { /* skip */ }
   }
-  state['corners' + slot] = byLeague;
+  return byLeague;
+}
+
+async function loadCorners(slot) {
+  const btn = document.getElementById('cornersBtn' + slot);
+  if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
+  const team = state['team' + slot];
+  if (!team) return;
+  state['corners' + slot] = await fetchCornerData(team.team.id, state['fixtures' + slot]);
   renderAll();
 }
 
 function cornerSectionHtml(corners, activeLeague, slot) {
   const teamName = state['team' + slot] ? state['team' + slot].team.name : '';
-  const label = slot === 2 ? `Corners — ${teamName}` : 'Corners';
   if (!corners || !Object.keys(corners).length) {
-    return `<div class="section"><div class="section-title">${label}</div>
+    return `<div class="section"><div class="section-title">Corners — ${teamName}</div>
       <button id="cornersBtn${slot}" class="btn-outline" onclick="loadCorners(${slot})" style="font-size:13px;padding:7px 16px">Load corner stats (last 15 games)</button>
     </div>`;
   }
@@ -1128,7 +1127,7 @@ function cornerSectionHtml(corners, activeLeague, slot) {
       </span>
     </div>`;
   }).join('');
-  return `<div class="section"><div class="section-title">${label} per game — last 15</div>${rows}</div>`;
+  return `<div class="section"><div class="section-title">Corners — ${teamName} (last 15)</div>${rows}</div>`;
 }
 
 // ── Main render ───────────────────────────────────────────────────────────────
