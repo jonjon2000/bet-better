@@ -548,14 +548,16 @@ async function searchPlayer() {
         .replace(/ß/g, 'ss').replace(/ð/gi, 'd').replace(/þ/gi, 'th')
         .replace(/ł/gi, 'l').replace(/ı/gi, 'i');
     }
+    // Always use normalized name for API calls (API rejects non-alphanumeric)
     const normalizedName = normalizeName(pName);
-
-    // Build a list of search terms to try: full name, last name only, first name only (+ normalized variants)
-    const parts = pName.trim().split(/\s+/);
     const normParts = normalizedName.trim().split(/\s+/);
-    const searchTerms = [...new Set([pName, normalizedName])];
-    if (parts.length > 1) { searchTerms.push(parts[parts.length - 1]); searchTerms.push(normParts[normParts.length - 1]); }
-    else { searchTerms.push(normParts[0]); }
+
+    // Build search terms from normalized name only: full, last name, first name
+    const searchTerms = [...new Set([
+      normalizedName,
+      normParts[normParts.length - 1],
+      normParts[0]
+    ])];
 
     for (const term of searchTerms) {
       if (found) break;
