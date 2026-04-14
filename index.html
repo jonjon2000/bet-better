@@ -486,6 +486,8 @@ function getResult(f, id) {
 }
 function gf(f, id) { return isHome(f, id) ? (f.goals.home || 0) : (f.goals.away || 0); }
 function ga(f, id) { return isHome(f, id) ? (f.goals.away || 0) : (f.goals.home || 0); }
+function htGF(f, id) { const ht = f.score && f.score.halftime; if (!ht) return null; return isHome(f, id) ? (ht.home || 0) : (ht.away || 0); }
+function htGA(f, id) { const ht = f.score && f.score.halftime; if (!ht) return null; return isHome(f, id) ? (ht.away || 0) : (ht.home || 0); }
 function pct(a, b) { return b === 0 ? 0 : Math.round((a / b) * 100); }
 function avg(arr) { return arr.length ? (arr.reduce((s, v) => s + v, 0) / arr.length).toFixed(1) : '0.0'; }
 function avgNum(arr) { return arr.length ? arr.reduce((s, v) => s + v, 0) / arr.length : 0; }
@@ -731,7 +733,13 @@ function calcStats(fixtures, id) {
   fixtures.forEach(f => { const lg = f.league.name; if (!byLeague[lg]) byLeague[lg] = []; byLeague[lg].push(f); });
   let streak = null;
   if (allRes.length) { const last = allRes[allRes.length - 1]; let n = 1; for (let i = allRes.length - 2; i >= 0; i--) { if (allRes[i] === last) n++; else break; } streak = { type: last, count: n }; }
-  return { homeF, awayF, allRes, homeRes, awayRes, hW, hD, hL, aW, aD, aL, hGF, hGA, aGF, aGA, cs, btts, byLeague, streak };
+  const htFx = fixtures.filter(f => htGF(f, id) !== null);
+  const ht1GF = htFx.reduce((s, f) => s + htGF(f, id), 0);
+  const ht1GA = htFx.reduce((s, f) => s + htGA(f, id), 0);
+  const ht2GF = htFx.reduce((s, f) => s + (gf(f, id) - htGF(f, id)), 0);
+  const ht2GA = htFx.reduce((s, f) => s + (ga(f, id) - htGA(f, id)), 0);
+  const htCount = htFx.length;
+  return { homeF, awayF, allRes, homeRes, awayRes, hW, hD, hL, aW, aD, aL, hGF, hGA, aGF, aGA, cs, btts, byLeague, streak, ht1GF, ht1GA, ht2GF, ht2GA, htCount };
 }
 
 function buildTrends(fixtures, id) {
@@ -1103,6 +1111,18 @@ function renderAll() {
         <div class="metric"><div class="metric-label">Goals/game away</div><div class="metric-value">${avg(s1.awayF.map(f => gf(f, id1)))}</div><div class="metric-sub">Conceding ${avg(s1.awayF.map(f => ga(f, id1)))}/game</div></div>
       </div>
     </div>
+    ${s1.htCount >= 3 ? `<div class="section"><div class="section-title">Goals by half</div>
+      <div class="metrics">
+        <div class="metric"><div class="metric-label">1st half scored</div><div class="metric-value">${(s1.ht1GF / s1.htCount).toFixed(2)}</div><div class="metric-sub">per game · ${s1.ht1GF} total</div></div>
+        <div class="metric"><div class="metric-label">2nd half scored</div><div class="metric-value">${(s1.ht2GF / s1.htCount).toFixed(2)}</div><div class="metric-sub">per game · ${s1.ht2GF} total</div></div>
+        <div class="metric"><div class="metric-label">1st half conceded</div><div class="metric-value">${(s1.ht1GA / s1.htCount).toFixed(2)}</div><div class="metric-sub">per game · ${s1.ht1GA} total</div></div>
+        <div class="metric"><div class="metric-label">2nd half conceded</div><div class="metric-value">${(s1.ht2GA / s1.htCount).toFixed(2)}</div><div class="metric-sub">per game · ${s1.ht2GA} total</div></div>
+      </div>
+      <div style="margin-top:10px;font-size:12px;color:var(--text-secondary)">
+        Goals scored: <strong>${pct(s1.ht1GF, s1.ht1GF + s1.ht2GF)}% in 1st half</strong> · ${pct(s1.ht2GF, s1.ht1GF + s1.ht2GF)}% in 2nd half &nbsp;|&nbsp;
+        Goals conceded: <strong>${pct(s1.ht1GA, s1.ht1GA + s1.ht2GA)}% in 1st half</strong> · ${pct(s1.ht2GA, s1.ht1GA + s1.ht2GA)}% in 2nd half
+      </div>
+    </div>` : ''}
     <div class="section"><div class="section-title">Last 5 results</div>
       <div class="result-row">${s1.allRes.slice(-5).map(r => `<div class="pill pill-${r}">${r}</div>`).join('')}</div>
     </div>
