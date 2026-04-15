@@ -370,8 +370,55 @@ const TEAM_ALIASES = {
   'palmeiras': 'Palmeiras',
 };
 
+// Direct team ID overrides — bypasses name search entirely for ambiguous clubs
+const TEAM_IDS = {
+  'bayern munich': 157, 'fc bayern': 157, 'bayern': 157,
+  'barcelona': 529, 'barca': 529, 'fc barcelona': 529,
+  'real madrid': 541, 'real': 541,
+  'atletico madrid': 530, 'atletico': 530, 'atleti': 530,
+  'manchester united': 33, 'man utd': 33, 'man united': 33,
+  'manchester city': 50, 'man city': 50,
+  'liverpool': 40,
+  'arsenal': 42,
+  'chelsea': 49,
+  'tottenham': 47, 'spurs': 47,
+  'psg': 85, 'paris saint germain': 85,
+  'juventus': 496, 'juve': 496,
+  'inter milan': 505, 'inter': 505,
+  'ac milan': 489, 'milan': 489,
+  'borussia dortmund': 165, 'bvb': 165, 'dortmund': 165,
+  'rb leipzig': 173, 'leipzig': 173,
+  'bayer leverkusen': 168, 'leverkusen': 168,
+  'ajax': 194,
+  'porto': 212,
+  'benfica': 211,
+  'sporting cp': 228, 'sporting': 228,
+  'roma': 497, 'as roma': 497,
+  'napoli': 492,
+  'lazio': 487,
+  'atalanta': 484,
+  'sevilla': 536,
+  'villarreal': 533,
+  'real sociedad': 548,
+  'athletic club': 531, 'athletic bilbao': 531,
+  'real betis': 543,
+  'valencia': 532,
+  'celtic': 31,
+  'rangers': 57,
+  'ajax': 194,
+  'psv': 197,
+  'feyenoord': 193,
+  'galatasaray': 2623,
+  'fenerbahce': 2632,
+  'besiktas': 2633,
+};
+
 function resolveTeamQuery(q) {
   return TEAM_ALIASES[q.toLowerCase().trim()] || q;
+}
+
+function resolveTeamId(q) {
+  return TEAM_IDS[q.toLowerCase().trim()] || null;
 }
 
 // ── History ───────────────────────────────────────────────────────────────────
@@ -534,7 +581,10 @@ async function searchPlayer() {
 
   try {
     const season = 2025;
-    const teamData = await apiFetch('/teams?search=' + encodeURIComponent(pTeam));
+    const knownTeamId = resolveTeamId(pTeam);
+    const teamData = knownTeamId
+      ? await apiFetch('/teams?id=' + knownTeamId)
+      : await apiFetch('/teams?search=' + encodeURIComponent(pTeam));
     if (!teamData.response || !teamData.response.length) { setPStatus('Team not found. Try a different spelling.', 'error'); return; }
     const team = teamData.response.slice().sort((a, b) => a.team.id - b.team.id)[0].team;
 
@@ -707,9 +757,11 @@ async function searchTeam(slot) {
   document.getElementById('btn' + slot).disabled = true;
   setStatus('Searching for team...', 'loading');
   try {
-    const data = await apiFetch('/teams?search=' + encodeURIComponent(query));
+    const knownId = resolveTeamId(raw);
+    const data = knownId
+      ? await apiFetch('/teams?id=' + knownId)
+      : await apiFetch('/teams?search=' + encodeURIComponent(query));
     if (!data.response || !data.response.length) { setStatus('No team found. Try a different spelling.', 'error'); return; }
-    // Always pick the team with the lowest ID — men's first teams predate women's teams in the DB
     const team = data.response.slice().sort((a, b) => a.team.id - b.team.id)[0];
     setStatus('Found ' + team.team.name + '. Loading fixtures...', 'loading');
     const season = 2025;
