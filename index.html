@@ -1152,13 +1152,8 @@ async function loadCorners(slot) {
   if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
   const team = state['team' + slot];
   if (!team) return;
-  try {
-    const data = await fetchCornerData(team.team.id, state['fixtures' + slot]);
-    // Use sentinel value so we know it was loaded even if empty
-    state['corners' + slot] = { _loaded: true, ...data };
-  } catch(e) {
-    state['corners' + slot] = { _loaded: true };
-  }
+  const data = await fetchCornerData(team.team.id, state['fixtures' + slot]);
+  state['corners' + slot] = { _loaded: true, leagues: data };
   renderAll();
 }
 
@@ -1170,14 +1165,15 @@ function cornerSectionHtml(corners, activeLeague, slot) {
       <button id="cornersBtn${slot}" class="btn-outline" onclick="loadCorners(${slot})" style="font-size:13px;padding:7px 16px">Load corner stats (last 15 games)</button>
     </div>`;
   }
-  const leagueEntries = Object.entries(corners).filter(([k]) => k !== '_loaded');
+  const leagues = corners.leagues || {};
+  const leagueEntries = Object.entries(leagues);
   if (!leagueEntries.length) {
     return `<div class="section"><div class="section-title">Corners — ${teamName}</div>
       <div style="font-size:13px;color:var(--text-secondary)">No corner data available for recent fixtures.</div>
     </div>`;
   }
-  const entries = activeLeague !== 'all' && corners[activeLeague]
-    ? [[activeLeague, corners[activeLeague]]]
+  const entries = activeLeague !== 'all' && leagues[activeLeague]
+    ? [[activeLeague, leagues[activeLeague]]]
     : leagueEntries;
   const rows = entries.map(([lg, d]) => {
     const avgFor = (d.for.reduce((s, v) => s + v, 0) / d.for.length).toFixed(1);
