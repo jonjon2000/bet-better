@@ -709,20 +709,8 @@ async function searchTeam(slot) {
   try {
     const data = await apiFetch('/teams?search=' + encodeURIComponent(query));
     if (!data.response || !data.response.length) { setStatus('No team found. Try a different spelling.', 'error'); return; }
-    const wantsWomen = /\sw$/i.test(raw.trim());
-    const womenKeywords = /women|femeni|feminino|femmes|damen|frauen|ladies|girls|femenino|\(w\)|\sw\b/i;
-    const results = data.response;
-    let pick;
-    if (wantsWomen) {
-      pick = results.filter(t => womenKeywords.test(t.team.name)) ;
-      if (!pick.length) pick = results;
-    } else {
-      // Exclude known women teams, then sort by team ID ascending (lower = older = men's first team)
-      pick = results.filter(t => !womenKeywords.test(t.team.name));
-      if (!pick.length) pick = results;
-      pick.sort((a, b) => a.team.id - b.team.id);
-    }
-    const team = pick[0];
+    // Always pick the team with the lowest ID — men's first teams predate women's teams in the DB
+    const team = data.response.slice().sort((a, b) => a.team.id - b.team.id)[0];
     setStatus('Found ' + team.team.name + '. Loading fixtures...', 'loading');
     const season = 2025;
     let fxDoneRes;
