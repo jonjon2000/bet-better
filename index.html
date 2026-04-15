@@ -536,7 +536,7 @@ async function searchPlayer() {
     const season = 2025;
     const teamData = await apiFetch('/teams?search=' + encodeURIComponent(pTeam));
     if (!teamData.response || !teamData.response.length) { setPStatus('Team not found. Try a different spelling.', 'error'); return; }
-    const team = teamData.response[0].team;
+    const team = teamData.response.slice().sort((a, b) => a.team.id - b.team.id)[0].team;
 
     setPStatus('Searching for ' + pName + '...', 'loading');
     let found = null;
