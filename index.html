@@ -563,6 +563,14 @@ function applyFormFilter(fixtures) {
 
 // ── Player Scout ─────────────────────────────────────────────────────────────
 renderHistory();
+
+// ── API Key persistence ───────────────────────────────────────────────────────
+const savedKey = localStorage.getItem('betbetter_apikey');
+if (savedKey) document.getElementById('apiKey').value = savedKey;
+document.getElementById('apiKey').addEventListener('input', () => {
+  localStorage.setItem('betbetter_apikey', document.getElementById('apiKey').value.trim());
+});
+
 document.getElementById('playerName').addEventListener('keydown', e => { if (e.key === 'Enter') searchPlayer(); });
 document.getElementById('playerTeam').addEventListener('keydown', e => { if (e.key === 'Enter') searchPlayer(); });
 document.getElementById('oddsInput').addEventListener('input', () => { if (playerData) renderPlayerResults(playerData); });
