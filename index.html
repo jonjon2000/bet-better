@@ -295,6 +295,17 @@ button:disabled { opacity: 0.35; cursor: not-allowed; }
         <input type="number" id="cornerOdds12p" placeholder="e.g. 3.20" step="0.01" min="1.01" style="width:90px" oninput="updateCornerGrid()" />
       </div>
     </div>
+    <div id="goalsAdvisorRow" style="display:none;margin-top:12px">
+      <label style="margin-bottom:8px">Goals scored odds (0–1 / 2–3 / 4+) — enter Winner odds to check value</label>
+      <div class="bookie-odds-row">
+        <label>0–1:</label>
+        <input type="number" id="goalOdds01" placeholder="e.g. 3.50" step="0.01" min="1.01" style="width:90px" oninput="updateGoalsGrid()" />
+        <label>2–3:</label>
+        <input type="number" id="goalOdds23" placeholder="e.g. 2.10" step="0.01" min="1.01" style="width:90px" oninput="updateGoalsGrid()" />
+        <label>4+:</label>
+        <input type="number" id="goalOdds4p" placeholder="e.g. 4.00" step="0.01" min="1.01" style="width:90px" oninput="updateGoalsGrid()" />
+      </div>
+    </div>
   </div>
   <div class="status" id="status"></div>
   <div id="results"></div>
@@ -1482,6 +1493,68 @@ function cornersBetHtml() {
   </div>`;
 }
 
+// ── Goals Bet Advisor ─────────────────────────────────────────────────────────
+function goalsValueCell(label, modelPct, inputId) {
+  const oddsVal = parseFloat(document.getElementById(inputId)?.value);
+  if (isNaN(oddsVal) || oddsVal <= 1) {
+    return `<div class="bookie-cell neutral">
+      <div class="bookie-outcome-label">${label}</div>
+      <div class="bookie-model-pct">${modelPct}%</div>
+      <div class="bookie-detail">model probability</div>
+    </div>`;
+  }
+  const implied = 1 / oddsVal;
+  const edge = (modelPct / 100) - implied;
+  let cls, verdict;
+  if (edge >= 0.05) { cls = 'value'; verdict = 'Value ✓'; }
+  else if (edge <= -0.05) { cls = 'no-value'; verdict = 'No value'; }
+  else { cls = 'fair'; verdict = 'Fair'; }
+  return `<div class="bookie-cell ${cls}">
+    <div class="bookie-outcome-label">${label}</div>
+    <div class="bookie-model-pct">${modelPct}%</div>
+    <div class="bookie-detail">${verdict} · implied ${Math.round(implied * 100)}% · edge ${edge >= 0 ? '+' : ''}${Math.round(edge * 100)}pts</div>
+  </div>`;
+}
+
+function updateGoalsGrid() {
+  const grid = document.getElementById('goalsGrid');
+  if (!grid || !state._lastGoalsCalc) return;
+  const { p01, p23, p4p } = state._lastGoalsCalc;
+  grid.innerHTML =
+    goalsValueCell('0–1 goals', Math.round(p01 * 100), 'goalOdds01') +
+    goalsValueCell('2–3 goals', Math.round(p23 * 100), 'goalOdds23') +
+    goalsValueCell('4+ goals',  Math.round(p4p * 100), 'goalOdds4p');
+}
+
+function goalsBetHtml(model) {
+  if (!model) { document.getElementById('goalsAdvisorRow').style.display = 'none'; return ''; }
+
+  const lambda = model.lambdaHome + model.lambdaAway;
+  function cdf(max) {
+    let p = 0;
+    for (let k = 0; k <= max; k++) p += poissonPmf(lambda, k);
+    return Math.min(p, 1);
+  }
+  const p01 = cdf(1), p23 = cdf(3) - cdf(1), p4p = 1 - cdf(3);
+  state._lastGoalsCalc = { p01, p23, p4p };
+
+  document.getElementById('goalsAdvisorRow').style.display = '';
+
+  return `<div class="section">
+    <div class="section-title">Goals bet advisor</div>
+    <div style="font-size:12px;color:var(--text-secondary);margin-bottom:10px">
+      Expected total goals: <strong>${lambda.toFixed(2)}</strong>
+      (${state.team1.team.name} ${model.lambdaHome.toFixed(2)} + ${state.team2.team.name} ${model.lambdaAway.toFixed(2)})
+    </div>
+    <div id="goalsGrid" class="bookie-grid">
+      ${goalsValueCell('0–1 goals', Math.round(p01 * 100), 'goalOdds01')}
+      ${goalsValueCell('2–3 goals', Math.round(p23 * 100), 'goalOdds23')}
+      ${goalsValueCell('4+ goals',  Math.round(p4p * 100), 'goalOdds4p')}
+    </div>
+    <div style="font-size:11px;color:var(--text-secondary);margin-top:8px">Enter odds in the card above · green = value (edge ≥ 5%), red = no value, amber = fair</div>
+  </div>`;
+}
+
 // ── Main render ───────────────────────────────────────────────────────────────
 function renderAll() {
   const t1 = state.team1; if (!t1) return;
@@ -1556,9 +1629,10 @@ function renderAll() {
 
     // Poisson model — use full (unfiltered) datasets so lambdas are stable
     const model = poissonModel(cf1, id1, cf2, id2);
-    poissonHtml = poissonSectionHtml(model, t1.team.name, t2.team.name);
+    poissonHtml = poissonSectionHtml(model, t1.team.name, t2.team.name) + goalsBetHtml(model);
   } else {
     document.getElementById('bookieOddsRow').style.display = 'none';
+    document.getElementById('goalsAdvisorRow').style.display = 'none';
   }
 
   document.getElementById('results').innerHTML = `<div class="card">
