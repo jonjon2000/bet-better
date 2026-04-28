@@ -284,6 +284,17 @@ button:disabled { opacity: 0.35; cursor: not-allowed; }
       </div>
       <div id="oddsStatus" style="font-size:12px;color:var(--text-secondary);margin-top:6px"></div>
     </div>
+    <div id="cornersAdvisorRow" style="display:none;margin-top:12px">
+      <label style="margin-bottom:8px">Corners bet odds (0–8 / 9–11 / 12+) — enter Winner odds to check value</label>
+      <div class="bookie-odds-row">
+        <label>0–8:</label>
+        <input type="number" id="cornerOdds08" placeholder="e.g. 2.50" step="0.01" min="1.01" style="width:90px" oninput="updateCornerGrid()" />
+        <label>9–11:</label>
+        <input type="number" id="cornerOdds911" placeholder="e.g. 2.10" step="0.01" min="1.01" style="width:90px" oninput="updateCornerGrid()" />
+        <label>12+:</label>
+        <input type="number" id="cornerOdds12p" placeholder="e.g. 3.20" step="0.01" min="1.01" style="width:90px" oninput="updateCornerGrid()" />
+      </div>
+    </div>
   </div>
   <div class="status" id="status"></div>
   <div id="results"></div>
@@ -1389,11 +1400,10 @@ function cornerSectionHtml(corners, activeLeague, slot) {
 // ── Corners Bet Advisor ───────────────────────────────────────────────────────
 function avgArr(arr) { return arr.length ? arr.reduce((s, v) => s + v, 0) / arr.length : 0; }
 
-function cornersBetHtml() {
+function cornersCalc() {
   const c1 = state.corners1, c2 = state.corners2;
-  if (!c1 || !c1._loaded || !c2 || !c2._loaded) return '';
+  if (!c1 || !c1._loaded || !c2 || !c2._loaded) return null;
 
-  // Get avg corners FOR each team (filtered by active league if set)
   function teamAvgFor(cornersObj) {
     const leagues = cornersObj.leagues || {};
     const active = state.activeLeague;
@@ -1402,67 +1412,73 @@ function cornersBetHtml() {
     return avgArr(all);
   }
 
-  const avg1 = teamAvgFor(c1);
-  const avg2 = teamAvgFor(c2);
-  if (avg1 === 0 && avg2 === 0) return '';
-
+  const avg1 = teamAvgFor(c1), avg2 = teamAvgFor(c2);
+  if (avg1 === 0 && avg2 === 0) return null;
   const lambda = avg1 + avg2;
 
-  // Poisson CDF
   function cdf(max) {
     let p = 0;
     for (let k = 0; k <= max; k++) p += poissonPmf(lambda, k);
     return Math.min(p, 1);
   }
 
-  const p08  = cdf(8);
-  const p911 = cdf(11) - cdf(8);
-  const p12p = 1 - cdf(11);
+  return {
+    lambda, avg1, avg2,
+    p08: cdf(8), p911: cdf(11) - cdf(8), p12p: 1 - cdf(11)
+  };
+}
 
-  const pcts = [Math.round(p08 * 100), Math.round(p911 * 100), Math.round(p12p * 100)];
-
-  function cornerValueCell(label, modelPct, inputId) {
-    const oddsVal = parseFloat(document.getElementById(inputId)?.value);
-    if (isNaN(oddsVal) || oddsVal <= 1) {
-      return `<div class="bookie-cell neutral">
-        <div class="bookie-outcome-label">${label}</div>
-        <div class="bookie-model-pct">${modelPct}%</div>
-        <div class="bookie-detail">model probability</div>
-      </div>`;
-    }
-    const implied = 1 / oddsVal;
-    const edge = (modelPct / 100) - implied;
-    let cls, verdict;
-    if (edge >= 0.05) { cls = 'value'; verdict = 'Value ✓'; }
-    else if (edge <= -0.05) { cls = 'no-value'; verdict = 'No value'; }
-    else { cls = 'fair'; verdict = 'Fair'; }
-    return `<div class="bookie-cell ${cls}">
+function cornerValueCell(label, modelPct, inputId) {
+  const oddsVal = parseFloat(document.getElementById(inputId)?.value);
+  if (isNaN(oddsVal) || oddsVal <= 1) {
+    return `<div class="bookie-cell neutral">
       <div class="bookie-outcome-label">${label}</div>
       <div class="bookie-model-pct">${modelPct}%</div>
-      <div class="bookie-detail">${verdict} · implied ${Math.round(implied * 100)}% · edge ${edge >= 0 ? '+' : ''}${Math.round(edge * 100)}pts</div>
+      <div class="bookie-detail">model probability</div>
     </div>`;
   }
+  const implied = 1 / oddsVal;
+  const edge = (modelPct / 100) - implied;
+  let cls, verdict;
+  if (edge >= 0.05) { cls = 'value'; verdict = 'Value ✓'; }
+  else if (edge <= -0.05) { cls = 'no-value'; verdict = 'No value'; }
+  else { cls = 'fair'; verdict = 'Fair'; }
+  return `<div class="bookie-cell ${cls}">
+    <div class="bookie-outcome-label">${label}</div>
+    <div class="bookie-model-pct">${modelPct}%</div>
+    <div class="bookie-detail">${verdict} · implied ${Math.round(implied * 100)}% · edge ${edge >= 0 ? '+' : ''}${Math.round(edge * 100)}pts</div>
+  </div>`;
+}
+
+function updateCornerGrid() {
+  const calc = cornersCalc();
+  const grid = document.getElementById('cornerGrid');
+  if (!calc || !grid) return;
+  const pcts = [Math.round(calc.p08 * 100), Math.round(calc.p911 * 100), Math.round(calc.p12p * 100)];
+  grid.innerHTML = cornerValueCell('0–8 corners', pcts[0], 'cornerOdds08') +
+    cornerValueCell('9–11 corners', pcts[1], 'cornerOdds911') +
+    cornerValueCell('12+ corners', pcts[2], 'cornerOdds12p');
+}
+
+function cornersBetHtml() {
+  const calc = cornersCalc();
+  if (!calc) { document.getElementById('cornersAdvisorRow').style.display = 'none'; return ''; }
+
+  document.getElementById('cornersAdvisorRow').style.display = '';
+  const pcts = [Math.round(calc.p08 * 100), Math.round(calc.p911 * 100), Math.round(calc.p12p * 100)];
 
   return `<div class="section">
     <div class="section-title">Corners bet advisor</div>
     <div style="font-size:12px;color:var(--text-secondary);margin-bottom:10px">
-      Expected total corners: <strong>${lambda.toFixed(1)}</strong>
-      (${state.team1.team.name} avg ${avg1.toFixed(1)} + ${state.team2.team.name} avg ${avg2.toFixed(1)})
+      Expected total corners: <strong>${calc.lambda.toFixed(1)}</strong>
+      (${state.team1.team.name} avg ${calc.avg1.toFixed(1)} + ${state.team2.team.name} avg ${calc.avg2.toFixed(1)})
     </div>
-    <div class="bookie-odds-row" style="margin-bottom:10px">
-      <label>0–8 odds:</label>
-      <input type="number" id="cornerOdds08" placeholder="e.g. 2.50" step="0.01" min="1.01" style="width:90px" oninput="renderAll()" />
-      <label>9–11 odds:</label>
-      <input type="number" id="cornerOdds911" placeholder="e.g. 2.10" step="0.01" min="1.01" style="width:90px" oninput="renderAll()" />
-      <label>12+ odds:</label>
-      <input type="number" id="cornerOdds12p" placeholder="e.g. 3.20" step="0.01" min="1.01" style="width:90px" oninput="renderAll()" />
-    </div>
-    <div class="bookie-grid">
+    <div id="cornerGrid" class="bookie-grid">
       ${cornerValueCell('0–8 corners', pcts[0], 'cornerOdds08')}
       ${cornerValueCell('9–11 corners', pcts[1], 'cornerOdds911')}
       ${cornerValueCell('12+ corners', pcts[2], 'cornerOdds12p')}
     </div>
-    <div style="font-size:11px;color:var(--text-secondary);margin-top:8px">Enter Winner odds above · green = value (edge ≥ 5%), red = no value, amber = fair</div>
+    <div style="font-size:11px;color:var(--text-secondary);margin-top:8px">Enter odds in the card above · green = value (edge ≥ 5%), red = no value, amber = fair</div>
   </div>`;
 }
 
