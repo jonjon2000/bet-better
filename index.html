@@ -610,12 +610,19 @@ const LEAGUE_TO_SPORT = {
 };
 
 function normalizeName(name) {
-  return name.toLowerCase().replace(/[^a-z0-9]/g, '');
+  return name.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]/g, '');
 }
 
 function nameMatch(a, b) {
   const na = normalizeName(a), nb = normalizeName(b);
-  return na === nb || na.includes(nb) || nb.includes(na);
+  if (na === nb || na.includes(nb) || nb.includes(na)) return true;
+  // Word-level match — catches "Bayern München" vs "Bayern Munich"
+  const sigWords = s => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .split(/[^a-z0-9]+/).filter(w => w.length >= 4);
+  const wa = sigWords(a), wb = sigWords(b);
+  return wa.some(w => wb.includes(w));
 }
 
 async function fetchLiveOdds() {
