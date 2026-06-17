@@ -241,6 +241,19 @@ button:disabled { opacity: 0.35; cursor: not-allowed; }
     <div class="history-list" id="historyList"></div>
   </div>
 
+  <!-- World Cup 2026 — National Teams (temporary) -->
+  <div class="card" style="border-color:var(--amber-border)">
+    <label style="color:var(--amber)">World Cup 2026 — national team results</label>
+    <div class="row">
+      <input type="text" id="ntInput" placeholder="Country — e.g. Brazil, Germany, England" />
+      <button id="ntBtn" onclick="searchNationalTeam()">Search</button>
+    </div>
+  </div>
+  <div class="status" id="ntstatus"></div>
+  <div id="ntResults"></div>
+
+  <hr class="section-divider" />
+
   <!-- Player Scout -->
   <div class="card">
     <label>Player scout — goals analysis &amp; value checker</label>
@@ -348,7 +361,7 @@ const TEAM_ALIASES = {
   // German
   'bvb': 'Borussia Dortmund', 'dortmund': 'Borussia Dortmund',
   'bmg': 'Borussia Monchengladbach', 'gladbach': 'Borussia Monchengladbach',
-  'fcb': 'Bayern Munich', 'bayern': 'Bayern Munich',
+  'bayern': 'Bayern Munich',
   'rb leipzig': 'RB Leipzig', 'leipzig': 'RB Leipzig',
   'leverkusen': 'Bayer Leverkusen',
   'frankfurt': 'Eintracht Frankfurt',
@@ -429,7 +442,6 @@ const TEAM_IDS = {
   'valencia': 532,
   'celtic': 31,
   'rangers': 57,
-  'ajax': 194,
   'psv': 197,
   'feyenoord': 193,
   'galatasaray': 2623,
@@ -1126,7 +1138,7 @@ function nextFixtureHtml(upcoming, team, allFixtures, id) {
 // ── H2H section HTML ──────────────────────────────────────────────────────────
 function h2hSectionHtml(h2hFixtures, id1, id2, name1, name2) {
   if (!h2hFixtures || !h2hFixtures.length) {
-    return `<div class="section"><div class="section-title">Head-to-head history (2024)</div><div style="font-size:13px;color:var(--text-secondary)">No H2H fixtures found for the 2024 season.</div></div>`;
+    return `<div class="section"><div class="section-title">Head-to-head history (2024–2025)</div><div style="font-size:13px;color:var(--text-secondary)">No H2H fixtures found for the 2024–2025 seasons.</div></div>`;
   }
 
   // Sort by date descending, take last 10
@@ -1183,7 +1195,7 @@ function h2hSectionHtml(h2hFixtures, id1, id2, name1, name2) {
   }).join('');
 
   return `<div class="section">
-    <div class="section-title">Head-to-head history (2024)</div>
+    <div class="section-title">Head-to-head history (2024–2025)</div>
     ${recordHtml}
     ${matchRows}
   </div>`;
@@ -1640,7 +1652,7 @@ function renderAll() {
       <img class="team-logo" src="${t1.team.logo}" onerror="this.style.display='none'" />
       <div>
         <div class="team-name">${t1.team.name}</div>
-        <div class="team-sub">${t1.venue?.name || ''} · ${f1.length} games analyzed · 2024/25</div>
+        <div class="team-sub">${t1.venue?.name || ''} · ${f1.length} games analyzed · 2025/26</div>
       </div>
     </div>
     ${filterBar}
@@ -1698,6 +1710,85 @@ function renderAll() {
 function toggleEv(i) { const el = document.getElementById('ev-' + i); if (el) el.classList.toggle('open'); }
 function setLeague(lg) { state.activeLeague = lg; renderAll(); }
 function setFormFilter(f) { state.formFilter = f; renderAll(); }
+
+// ── World Cup 2026 — National Teams (temporary) ───────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  const ntInput = document.getElementById('ntInput');
+  if (ntInput) ntInput.addEventListener('keydown', e => { if (e.key === 'Enter') searchNationalTeam(); });
+});
+
+function setNtStatus(msg, type) {
+  const el = document.getElementById('ntstatus');
+  el.className = 'status ' + (type || '');
+  el.innerHTML = type === 'loading' ? '<div class="spinner"></div>' + msg : (msg || '');
+}
+
+async function searchNationalTeam() {
+  const raw = document.getElementById('ntInput').value.trim();
+  if (!raw) { setNtStatus('Enter a country name.', 'error'); return; }
+  if (!document.getElementById('apiKey').value.trim()) { setNtStatus('Please enter your API key first.', 'error'); return; }
+
+  document.getElementById('ntBtn').disabled = true;
+  setNtStatus('Searching...', 'loading');
+  document.getElementById('ntResults').innerHTML = '';
+
+  try {
+    const data = await apiFetch('/teams?search=' + encodeURIComponent(raw));
+    if (!data.response || !data.response.length) { setNtStatus('No team found. Try a different spelling.', 'error'); return; }
+
+    // Prefer national team entry; fall back to first result
+    const entry = data.response.find(t => t.team.national === true) || data.response[0];
+
+    setNtStatus('Loading fixtures...', 'loading');
+    const fx = await apiFetch('/fixtures?team=' + entry.team.id + '&last=15');
+    const fixtures = (fx.response || []).sort((a, b) => new Date(b.fixture.date) - new Date(a.fixture.date));
+
+    if (!fixtures.length) { setNtStatus('No recent fixtures found.', 'error'); return; }
+
+    setNtStatus('');
+    renderNationalTeam(entry.team, fixtures);
+  } catch (e) {
+    setNtStatus(e.message, 'error');
+  } finally {
+    document.getElementById('ntBtn').disabled = false;
+  }
+}
+
+function renderNationalTeam(team, fixtures) {
+  const rows = fixtures.map(f => {
+    const isH = f.teams.home.id === team.id;
+    const myG = isH ? f.goals.home : f.goals.away;
+    const oppG = isH ? f.goals.away : f.goals.home;
+    const score = (f.goals.home ?? '?') + ' – ' + (f.goals.away ?? '?');
+    const finished = ['FT', 'AET', 'PEN'].includes(f.fixture.status.short);
+    const upcoming = ['NS', 'TBD', 'PST'].includes(f.fixture.status.short);
+    let r = null;
+    if (finished) r = myG > oppG ? 'W' : myG < oppG ? 'L' : 'D';
+
+    const rightCol = r !== null
+      ? `<span class="cp cp-${r}">${r}</span>`
+      : `<span style="font-size:11px;color:var(--text-secondary)">${upcoming ? 'Upcoming' : f.fixture.status.short}</span>`;
+
+    return `<div class="h2h-match-row">
+      <span class="h2h-date">${fmtDateFull(f.fixture.date)}</span>
+      <span class="h2h-teams">${f.teams.home.name} vs ${f.teams.away.name}</span>
+      <span class="h2h-score">${finished ? score : '–'}</span>
+      ${rightCol}
+      <span class="h2h-league">${f.league.name}</span>
+    </div>`;
+  }).join('');
+
+  document.getElementById('ntResults').innerHTML = `<div class="card" style="margin-bottom:1rem">
+    <div class="team-header">
+      <img class="team-logo" src="${team.logo}" onerror="this.style.display='none'" />
+      <div>
+        <div class="team-name">${team.name}</div>
+        <div class="team-sub">Last ${fixtures.length} fixtures — all competitions</div>
+      </div>
+    </div>
+    ${rows}
+  </div>`;
+}
 </script>
 </body>
 </html>
