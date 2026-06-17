@@ -948,11 +948,15 @@ async function searchTeam(slot) {
     fxDoneRes = await apiFetch('/fixtures?team=' + team.team.id + '&season=' + season + '&status=FT-AET-PEN');
 
     // Fallback for national teams whose fixtures span multiple seasons (e.g. WC 2026)
-    if (!fxDoneRes.response || !fxDoneRes.response.length) {
-      setStatus('Trying last 30 fixtures...', 'loading');
+    // Also triggers when season returns very few results (e.g. England with only 2 in 2025)
+    if (!fxDoneRes.response || fxDoneRes.response.length < 5) {
+      setStatus('Loading full fixture history...', 'loading');
       const fallback = await apiFetch('/fixtures?team=' + team.team.id + '&last=30');
       if (fallback.response && fallback.response.length) {
-        fxDoneRes = { response: fallback.response.filter(f => ['FT', 'AET', 'PEN'].includes(f.fixture.status.short)) };
+        const completed = fallback.response.filter(f => ['FT', 'AET', 'PEN'].includes(f.fixture.status.short));
+        if (completed.length > (fxDoneRes.response || []).length) {
+          fxDoneRes = { response: completed };
+        }
       }
     }
 
