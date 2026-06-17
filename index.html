@@ -981,12 +981,16 @@ async function searchTeam(slot) {
     state['corners' + slot] = null;
 
     // Fetch team statistics per league (goal timing breakdown)
+    // Use each fixture's own season so multi-season national team data works correctly
     setStatus('Loading goal timing data...', 'loading');
     const uniqueLeagues = [...new Map(fixtures.map(f => [f.league.id, f.league])).values()];
+    const leagueSeasons = {};
+    fixtures.forEach(f => { if (!leagueSeasons[f.league.id]) leagueSeasons[f.league.id] = f.league.season; });
     const statsCache = {};
     for (const lg of uniqueLeagues) {
       try {
-        const tsData = await apiFetch('/teams/statistics?season=' + usedSeason + '&team=' + team.team.id + '&league=' + lg.id);
+        const lgSeason = leagueSeasons[lg.id] || usedSeason;
+        const tsData = await apiFetch('/teams/statistics?season=' + lgSeason + '&team=' + team.team.id + '&league=' + lg.id);
         if (tsData.response) statsCache[lg.name] = tsData.response;
       } catch (e) { /* skip */ }
     }
