@@ -1712,6 +1712,18 @@ function setLeague(lg) { state.activeLeague = lg; renderAll(); }
 function setFormFilter(f) { state.formFilter = f; renderAll(); }
 
 // ── World Cup 2026 — National Teams (temporary) ───────────────────────────────
+const NATIONAL_TEAM_IDS = {
+  'argentina': 26, 'australia': 28, 'belgium': 1, 'brazil': 24,
+  'canada': 107, 'colombia': 8, 'croatia': 3, 'ecuador': 30,
+  'england': 10, 'france': 2, 'germany': 25, 'japan': 21,
+  'mexico': 7, 'morocco': 32, 'netherlands': 1118, 'nigeria': 36,
+  'poland': 23, 'portugal': 27, 'saudi arabia': 51, 'senegal': 34,
+  'serbia': 45, 'south korea': 33, 'spain': 9, 'switzerland': 15,
+  'ukraine': 38, 'uruguay': 14, 'usa': 16, 'united states': 16,
+  'iran': 29, 'ghana': 31, 'cameroon': 37, 'tunisia': 40,
+  'costa rica': 18, 'paraguay': 17, 'venezuela': 37,
+  'new zealand': 133, 'bolivia': 16,
+};
 document.addEventListener('DOMContentLoaded', () => {
   const ntInput = document.getElementById('ntInput');
   if (ntInput) ntInput.addEventListener('keydown', e => { if (e.key === 'Enter') searchNationalTeam(); });
@@ -1733,23 +1745,35 @@ async function searchNationalTeam() {
   document.getElementById('ntResults').innerHTML = '';
 
   try {
-    // Try exact name first (more reliable for national teams), fall back to fuzzy search
-    let response = [];
-    const exact = await apiFetch('/teams?name=' + encodeURIComponent(raw));
-    if (exact.response && exact.response.length) response = exact.response;
-    else {
-      const fuzzy = await apiFetch('/teams?search=' + encodeURIComponent(raw));
-      response = fuzzy.response || [];
-    }
-    if (!response.length) { setNtStatus('No team found. Try a different spelling.', 'error'); return; }
-
-    // Pick national team: exact name + national > any national > exact name > first
     const lc = raw.toLowerCase();
-    const entry =
-      response.find(t => t.team.national === true && t.team.name.toLowerCase() === lc) ||
-      response.find(t => t.team.national === true) ||
-      response.find(t => t.team.name.toLowerCase() === lc) ||
-      response[0];
+    let entry = null;
+
+    // 1. Try hardcoded national team ID (most reliable)
+    const knownId = NATIONAL_TEAM_IDS[lc];
+    if (knownId) {
+      const d = await apiFetch('/teams?id=' + knownId);
+      if (d.response && d.response.length) entry = d.response[0];
+    }
+
+    // 2. Fall back: exact name search, prefer national flag
+    if (!entry) {
+      const exact = await apiFetch('/teams?name=' + encodeURIComponent(raw));
+      const resp = exact.response || [];
+      entry = resp.find(t => t.team.national === true && t.team.name.toLowerCase() === lc)
+           || resp.find(t => t.team.national === true)
+           || resp[0];
+    }
+
+    // 3. Last resort: fuzzy search
+    if (!entry) {
+      const fuzzy = await apiFetch('/teams?search=' + encodeURIComponent(raw));
+      const resp = fuzzy.response || [];
+      entry = resp.find(t => t.team.national === true)
+           || resp.find(t => t.team.name.toLowerCase() === lc)
+           || resp[0];
+    }
+
+    if (!entry) { setNtStatus('No team found. Try a different spelling.', 'error'); return; }
 
     setNtStatus('Loading fixtures...', 'loading');
     const fx = await apiFetch('/fixtures?team=' + entry.team.id + '&last=15');
