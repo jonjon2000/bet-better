@@ -947,8 +947,21 @@ async function searchTeam(slot) {
 
     fxDoneRes = await apiFetch('/fixtures?team=' + team.team.id + '&season=' + season + '&status=FT-AET-PEN');
 
+    // Fallback for national teams whose fixtures span multiple seasons (e.g. WC 2026)
+    if (!fxDoneRes.response || !fxDoneRes.response.length) {
+      setStatus('Trying last 30 fixtures...', 'loading');
+      const fallback = await apiFetch('/fixtures?team=' + team.team.id + '&last=30');
+      if (fallback.response && fallback.response.length) {
+        fxDoneRes = { response: fallback.response.filter(f => ['FT', 'AET', 'PEN'].includes(f.fixture.status.short)) };
+      }
+    }
+
     const usedSeason = (fxDoneRes.response && fxDoneRes.response.length) ? fxDoneRes.response[0].league.season : season;
-    const fxNext = await apiFetch('/fixtures?team=' + team.team.id + '&season=' + usedSeason + '&status=NS-TBD&from=' + today() + '&to=' + futureDate(60));
+    let fxNext = await apiFetch('/fixtures?team=' + team.team.id + '&season=' + usedSeason + '&status=NS-TBD&from=' + today() + '&to=' + futureDate(60));
+    // Fallback upcoming: fetch next 10 fixtures without season filter
+    if (!fxNext.response || !fxNext.response.length) {
+      fxNext = await apiFetch('/fixtures?team=' + team.team.id + '&next=10');
+    }
 
     const fixtures = fxDoneRes.response || [];
     if (!fixtures.length) { setStatus('No completed fixtures found for this team.', 'error'); return; }
