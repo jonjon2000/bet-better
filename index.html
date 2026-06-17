@@ -280,6 +280,9 @@ button:disabled { opacity: 0.35; cursor: not-allowed; }
       <input type="text" id="team1" placeholder="Team 1 — e.g. Arsenal" />
       <button id="btn1" onclick="searchTeam(1)">Analyze</button>
     </div>
+    <div style="margin-bottom:8px">
+      <button class="btn-outline" onclick="swapTeams()" style="font-size:12px;padding:5px 12px">↕ Swap teams</button>
+    </div>
     <div class="row" style="margin-bottom:12px">
       <input type="text" id="team2" placeholder="Team 2 (optional — for side by side comparison)" />
       <button id="btn2" class="btn-outline" onclick="searchTeam(2)">Compare</button>
@@ -1728,6 +1731,19 @@ function renderAll() {
 function toggleEv(i) { const el = document.getElementById('ev-' + i); if (el) el.classList.toggle('open'); }
 function setLeague(lg) { state.activeLeague = lg; renderAll(); }
 function setFormFilter(f) { state.formFilter = f; renderAll(); }
+
+function swapTeams() {
+  const i1 = document.getElementById('team1'), i2 = document.getElementById('team2');
+  [i1.value, i2.value] = [i2.value, i1.value];
+  if (state.team1 && state.team2) {
+    [state.team1, state.team2] = [state.team2, state.team1];
+    [state.fixtures1, state.fixtures2] = [state.fixtures2, state.fixtures1];
+    [state.upcoming1, state.upcoming2] = [state.upcoming2, state.upcoming1];
+    [state.corners1, state.corners2] = [state.corners2, state.corners1];
+    [state.teamStats1, state.teamStats2] = [state.teamStats2, state.teamStats1];
+    renderAll();
+  }
+}
 
 // ── World Cup 2026 — National Teams (temporary) ───────────────────────────────
 const NATIONAL_TEAM_IDS = {
