@@ -1733,11 +1733,23 @@ async function searchNationalTeam() {
   document.getElementById('ntResults').innerHTML = '';
 
   try {
-    const data = await apiFetch('/teams?search=' + encodeURIComponent(raw));
-    if (!data.response || !data.response.length) { setNtStatus('No team found. Try a different spelling.', 'error'); return; }
+    // Try exact name first (more reliable for national teams), fall back to fuzzy search
+    let response = [];
+    const exact = await apiFetch('/teams?name=' + encodeURIComponent(raw));
+    if (exact.response && exact.response.length) response = exact.response;
+    else {
+      const fuzzy = await apiFetch('/teams?search=' + encodeURIComponent(raw));
+      response = fuzzy.response || [];
+    }
+    if (!response.length) { setNtStatus('No team found. Try a different spelling.', 'error'); return; }
 
-    // Prefer national team entry; fall back to first result
-    const entry = data.response.find(t => t.team.national === true) || data.response[0];
+    // Pick national team: exact name + national > any national > exact name > first
+    const lc = raw.toLowerCase();
+    const entry =
+      response.find(t => t.team.national === true && t.team.name.toLowerCase() === lc) ||
+      response.find(t => t.team.national === true) ||
+      response.find(t => t.team.name.toLowerCase() === lc) ||
+      response[0];
 
     setNtStatus('Loading fixtures...', 'loading');
     const fx = await apiFetch('/fixtures?team=' + entry.team.id + '&last=15');
