@@ -454,7 +454,8 @@ function resolveTeamQuery(q) {
 }
 
 function resolveTeamId(q) {
-  return TEAM_IDS[q.toLowerCase().trim()] || null;
+  const lc = q.toLowerCase().trim();
+  return TEAM_IDS[lc] || NATIONAL_TEAM_IDS[lc] || null;
 }
 
 // ── History ───────────────────────────────────────────────────────────────────
